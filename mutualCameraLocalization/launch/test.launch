@@ -1,0 +1,18 @@
+<launch> 
+
+    <!-- Name of the YAML file containing the marker positions -->
+    <arg name="YAML_file_name" default="demo_marker_positions"/>
+
+    <!-- File containing the the marker positions in the trackable's frame of reference -->
+    <arg name="marker_positions_file" default="$(find monocular_pose_estimator)/marker_positions/$(arg YAML_file_name).yaml"/> 
+
+    <node name="monocular_pose_estimator" pkg="monocular_pose_estimator" type="monocular_pose_estimator" respawn="false" output="screen"> 
+        <rosparam command="load" file="$(arg marker_positions_file)"/>
+        <param name= "threshold_value" value = "140" />
+        <param name= "gaussian_sigma" value = "0.6" />
+        <param name= "min_blob_area" value = "10" />
+        <param name= "max_blob_area" value = "200" />
+        <param name= "max_width_height_distortion" value = "0.5" />
+        <param name= "max_circular_distortion" value = "0.5" />
+    </node>
+</launch>
