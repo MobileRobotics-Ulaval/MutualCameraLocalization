@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
 )
 find_package(OpenCV REQUIRED)
+FIND_PACKAGE (Threads)
 #include_directories(${OpenCV_INCLUDE_DIRS})
 #target_link_libraries(${OpenCV_LIBRARIES})
 
@@ -183,9 +184,11 @@ add_executable( client_cube
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
-
+include_directories( ${ZLIB_INCLUDE_DIRS} )
+FIND_PACKAGE (ZLIB REQUIRED)
 target_link_libraries(client_cube
    ${catkin_LIBRARIES}
    ${OpenCV_LIBRARIES}
    ${PROTOBUF_LIBRARY}
+   pthread
 )

@@ -9,7 +9,7 @@ using namespace std;
 */
 Client::Client(string hostName, int port): recording(false){
     image_transport::ImageTransport it(nh);
-    pub = it.advertise("/cube_feed_topic", 1);
+    pub = it.advertiseCamera("/camera/image_raw", 1);
     //pub = nh.advertise<sensor_msgs::Image>("/cube_feed_topic", 1);
     //if(!nh.ok()){
     //    printf("Not ok");
@@ -53,7 +53,7 @@ int Client::startListeningLoop(){
         }
         if(i == 1){ 
             if(isRecording()){
-                printf("Already Recording!!\n");
+                printf("Stop recording before exiting\n");
                 continue;
             }
             printf("Send start_recording command\n");
@@ -68,7 +68,7 @@ int Client::startListeningLoop(){
         }
         else if(i == 2){ 
             if(!isRecording()){
-                printf("Not yet Recording!!\n");
+                printf("Not currently recording!!\n");
                 continue;
             } 
 
@@ -204,6 +204,7 @@ void* Client::receivingImgLoop(){
     IplImage* pImg;
     pImg = cvCreateImageHeader(cvSize(WIDTH, HEIGHT), IPL_DEPTH_8U, 1);
     sensor_msgs::Image ros_image;
+    sensor_msgs::CameraInfo ros_camInfo;
 
     printf("\n");
 
@@ -243,7 +244,7 @@ void    publish (const sensor_msgs::ImageConstPtr &image, const sensor_msgs::Cam
 void    publish (sensor_msgs::Image &image, sensor_msgs::CameraInfo &info, ros::Time stamp) const
     Publish an (image, info) pair with given timestamp on the topics associated with this CameraPublisher. */
         
-        pub.publish(ros_image);
+        pub.publish(ros_image, ros_camInfo);
 
         //compressToPNG(pngBuf, &pngSize, iz4BuffDecod, sizeLz4);
         //saveFilePNG(*pngBuf, pngSize, "fromGoogleWithLove.png");
@@ -260,16 +261,22 @@ void    publish (sensor_msgs::Image &image, sensor_msgs::CameraInfo &info, ros::
 */
 bool Client::isRecording(){
     bool r;
+    printf("[isrecord");
     pthread_mutex_lock(&recordingMux);
     r = recording;
+    printf("u");
     pthread_mutex_unlock(&recordingMux);
+    printf("]\n");
     return r;
 }
 
 void Client::setRecording(bool r){
+    printf("[setrecord");
     pthread_mutex_lock(&recordingMux);
     recording = r;
+    printf("u");
     pthread_mutex_unlock(&recordingMux);
+    printf("]\n");
 }
 
 
