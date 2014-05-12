@@ -1,6 +1,0 @@
-package dotCapture;
-
-message img{
-	required uint32 timestamp = 1;
-	required byte image = 2;	
-}
