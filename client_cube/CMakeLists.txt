@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   cv_bridge
   sensor_msgs
+  camera_info_manager
 )
 find_package(OpenCV REQUIRED)
 FIND_PACKAGE (Threads)
@@ -93,7 +94,7 @@ catkin_package(
 #  LIBRARIES beginner_tutorials
 #  CATKIN_DEPENDS image_transport roscpp rospy std_msgs
   INCLUDE_DIRS include
-  CATKIN_DEPENDS message_runtime roscpp cv_bridge image_transport sensor_msgs
+  CATKIN_DEPENDS message_runtime roscpp cv_bridge image_transport sensor_msgs camera_info_manager
   DEPENDS eigen OpenCV
 #  DEPENDS system_lib
 )

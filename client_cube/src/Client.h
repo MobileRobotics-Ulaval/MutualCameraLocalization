@@ -31,6 +31,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <sensor_msgs/image_encodings.h>
+#include <camera_info_manager/camera_info_manager.h>
 #include "proto/img.pb.h"
 #include "proto/command.pb.h"
 

@@ -42,7 +42,7 @@ int Client::startListeningLoop(){
     pthread_t imgGathering;
     bool flag = true;
     do{
-        printf("\n==== MENU ====\n1. Start recording\n2. Stop recording\n3. Change Shutter\n4. Quit\nTo do? ");
+        printf("\n==== MENU ====\n1. Start recording\n2. Stop recording\n3. Change Shutter\n4. Change Threshold\n5. Quit\nTo do? ");
         string s = "";
         int i;
         getline(cin, s);
@@ -96,6 +96,20 @@ int Client::startListeningLoop(){
             sendCommand(d);
         }
         else if(i == 4){ 
+            dotCapture::Command d;
+            dotCapture::Command_Option* o = d.add_option();
+            o->set_type(dotCapture::Command::THRESHOLD);
+
+            printf("What Value?");
+            float v;
+            getline(cin, s);
+            istringstream myStream(s);
+            myStream >> v;
+            o->set_value(v);
+            printf("Sending command THRESHOLD with v=%.3f\n", v);
+            sendCommand(d);
+        }
+        else if(i == 5){ 
             if(!isRecording()){
                 dotCapture::Command d;
                 d.add_option()->set_type(dotCapture::Command::DISCONNECT);
@@ -193,8 +207,8 @@ void* Client::receivingImgLoop(){
     int sizeLz4;
 
 
-    unsigned char** pngBuf = new unsigned char*();
-    size_t pngSize;
+    //unsigned char** pngBuf = new unsigned char*();
+   // size_t pngSize;
 
     unsigned char* iz4BuffDecod = (unsigned char*)malloc(WIDTH * HEIGHT);
 
@@ -204,7 +218,10 @@ void* Client::receivingImgLoop(){
     IplImage* pImg;
     pImg = cvCreateImageHeader(cvSize(WIDTH, HEIGHT), IPL_DEPTH_8U, 1);
     sensor_msgs::Image ros_image;
-    sensor_msgs::CameraInfo ros_camInfo;
+
+    camera_info_manager::CameraInfoManager m(nh, "narrow_stereo", "package://client_cube/calibration.ini");
+
+    sensor_msgs::CameraInfo ros_camInfo = m.getCameraInfo();
 
     printf("\n");
 
@@ -251,9 +268,9 @@ void    publish (sensor_msgs::Image &image, sensor_msgs::CameraInfo &info, ros::
         i++;
         //ros::spinOnce();
         //loop_rate.sleep();
+        free(buffer);
     }
     printf("Images total =%i\n", i);
-    free(buffer);
 }
 
 /*
