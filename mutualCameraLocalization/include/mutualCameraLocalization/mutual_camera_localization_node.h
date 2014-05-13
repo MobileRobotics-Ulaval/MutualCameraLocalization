@@ -60,10 +60,12 @@ private:
 
   ros::NodeHandle nh_;
 
-  image_transport::Publisher image_pub_; //!< The ROS image publisher that publishes the visualisation image
+  image_transport::Publisher image_pubA_; //!< The ROS image publisher that publishes the visualisation image
+  image_transport::Publisher image_pubB_; //!< The ROS image publisher that publishes the visualisation image
   ros::Publisher pose_pub_; //!< The ROS publisher that publishes the estimated pose.
 
-  ros::Subscriber image_sub_; //!< The ROS subscriber to the raw camera image
+  ros::Subscriber image_subA_; //!< The ROS subscriber to the raw camera image A
+  ros::Subscriber image_subB_; //!< The ROS subscriber to the raw camera image B
   ros::Subscriber camera_info_sub_; //!< The ROS subscriber to the camera info
 
   //dynamic_reconfigure::Server<monocular_pose_estimator::MonocularPoseEstimatorConfig> dr_server_; //!< The dynamic reconfigure server
@@ -72,6 +74,7 @@ private:
   //geometry_msgs::PoseWithCovarianceStamped predicted_pose_; //!< The ROS message variable for the estimated pose and covariance of the object
 
   bool have_camera_info_; //!< The boolean variable that indicates whether the camera calibration parameters have been obtained from the camera
+  bool camB_ready_;
   sensor_msgs::CameraInfo cam_info_; //!< Variable to store the camera calibration parameters
 
   //PoseEstimator trackable_object_; //!< Declaration of the object whose pose will be estimated
@@ -82,21 +85,33 @@ private:
   std::vector<double> camera_distortion_coeffs_; //!< Variable to store the camera distortion parameters
   std::vector<cv::Point2f> distorted_detection_centers_;
   Matrix3x4d camera_projection_matrix_; //!< Stores the camera calibration matrix. This is the 3x4 projection matrix that projects the world points to the image coordinates stored in #image_points_.
-  List3DPoints image_vectors_;
-  List2DPoints image_vectors_2;
+  List2DPoints image_vectorsA_;
+  List2DPoints image_vectorsB_;
+  //List2DPoints image_vectors_2;
 public:
 
   MPENode();
   ~MPENode();
-
+  void imageCallbackA(const sensor_msgs::Image::ConstPtr& image_msg);
+  void imageCallbackB(const sensor_msgs::Image::ConstPtr& image_msg);
   void cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
 
-  void imageCallback(const sensor_msgs::Image::ConstPtr& image_msg);
-  bool callDetectLed(cv::Mat image);
+  void imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const bool camA);
+  bool callDetectLed(cv::Mat image, const bool camA);
+
+
+  Eigen::Vector2d ComputePositionMutual(double alpha, double beta, double d);
+  Eigen::MatrixXd vrrotvec2mat(double p, Eigen::Vector3d r);
+  Eigen::MatrixXd Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Eigen::Vector2d ImageA2,
+                                            Eigen::Vector2d ImageB1, Eigen::Vector2d ImageB2,
+                                            Eigen::Vector2d ppA, Eigen::Vector2d ppB,
+                                            Eigen::Vector2d fCamA, Eigen::Vector2d fCamB,
+                                            double rdA, double ldA, double rdB, double ldB,
+                                            Eigen::Vector3d* pos, double* dist);
 
   //void dynamicParametersCallback(monocular_pose_estimator::MonocularPoseEstimatorConfig &config, uint32_t level);
 
-  void calculateImageVectors(List2DPoints image_points);
+  //void calculateImageVectors(List2DPoints image_points);
 };
 
 } // monocular_pose_estimator namespace

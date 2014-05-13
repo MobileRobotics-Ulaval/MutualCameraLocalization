@@ -1,6 +1,6 @@
 CC =g++
 #CC = arm-linux-gnueabihf-g++
-#CFLAGS = -std=c++11 
+
 CFLAGS = -pthread
 OUTPUTNAME = FlyCamServer${D} 
 INCLUDE =-I../include -I/../lib -I/usr/arm-linux-gnueabihf/lib  

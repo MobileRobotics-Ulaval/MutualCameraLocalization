@@ -15,8 +15,8 @@ int main(int argc, char* argv[]){
 			}
 			else{
 				printf("Cube id: %s\n", argv[1]);
-				//ros::init(argc, argv,  std::string("image_publisher")+std::string(argv[1]));
-				ros::init(argc, argv,  std::string("image_publisher"));
+				ros::init(argc, argv,  std::string("image_publisher")+std::string(argv[1]));
+				//ros::init(argc, argv,  std::string("image_publisher"));
 				printf("Host: %s\n", argv[2]);
 				Client client(argv[1], std::string(argv[2]), 5005);
 				client.startListeningLoop();

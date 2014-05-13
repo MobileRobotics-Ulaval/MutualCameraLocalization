@@ -190,22 +190,22 @@ void LedsFinder::startProcessingLoop(){
 */
 bool LedsFinder::isRecording(){
     bool r;
-    //printf("[isrecord");
+    printf("[isrecord");
     pthread_mutex_lock(&recordingMux);
     r = recording;
-    //printf("u");
+    printf("u");
     pthread_mutex_unlock(&recordingMux);
-    //printf("]\n");
+    printf("]\n");
     return r;
 }
 
 void LedsFinder::setRecording(bool r){
-   // printf("[setrecord");
+    printf("[setrecord");
     pthread_mutex_lock(&recordingMux);
     recording = r;
-    //printf("u");
+    printf("u");
     pthread_mutex_unlock(&recordingMux);
-    //printf("]\n");
+    printf("]\n");
 }
 
 /*

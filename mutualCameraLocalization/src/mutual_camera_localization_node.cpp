@@ -21,7 +21,7 @@ namespace monocular_pose_estimator
  * Constructor of the Monocular Pose Estimation Node class
  *
  */
-MPENode::MPENode()
+MPENode::MPENode():camB_ready_(false)
 {
   // Set up a dynamic reconfigure server.
   // This should be done before reading parameter server values.
@@ -30,7 +30,8 @@ MPENode::MPENode()
   //dr_server_.setCallback(cb_);
 
   // Initialize subscribers
-  image_sub_ = nh_.subscribe("/cameraA/image_raw", 1, &MPENode::imageCallback, this);
+  image_subA_ = nh_.subscribe("/cameraA/image_raw", 1, &MPENode::imageCallbackA, this);
+  image_subB_ = nh_.subscribe("/cameraB/image_raw", 1, &MPENode::imageCallbackB, this);
   camera_info_sub_ = nh_.subscribe("/cameraA/camera_info", 1, &MPENode::cameraInfoCallback, this);
 
   // Initialize pose publisher
@@ -38,7 +39,8 @@ MPENode::MPENode()
 
   // Initialize image publisher for visualization
   image_transport::ImageTransport image_transport(nh_);
-  image_pub_ = image_transport.advertise("image_with_detections", 1);
+  image_pubA_ = image_transport.advertise("image_with_detectionsA", 1);
+  image_pubB_ = image_transport.advertise("image_with_detectionsB", 1);
 
   // Create the marker positions from the test points
    /*List4DPoints positions_of_markers_on_object;
@@ -84,8 +86,7 @@ MPENode::~MPENode()
  * \param msg the ROS message containing the camera calibration information
  *
  */
-void MPENode::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg)
-{
+void MPENode::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
   if (!have_camera_info_)
   {
     cam_info_ = *msg;
@@ -132,45 +133,51 @@ void MPENode::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg)
 
 }
 
-void MPENode::calculateImageVectors(List2DPoints image_points){
-  unsigned num_image_points = image_points.size();
-  image_vectors_.resize(num_image_points);
-  image_vectors_2.resize(num_image_points);
-  Eigen::Vector3d single_vector;
-  Eigen::Vector2d single_vector2;
+//void MPENode::calculateImageVectors(List2DPoints image_points){}
 
-  for (unsigned i = 0; i < num_image_points; ++i){
-    single_vector(0) = (image_points(i)(0) - camera_projection_matrix_(0, 2)) / camera_projection_matrix_(0, 0);
-    single_vector(1) = (image_points(i)(1) - camera_projection_matrix_(1, 2)) / camera_projection_matrix_(1, 1);
-    single_vector(2) = 1;
-    single_vector2(0) = single_vector[0];
-    single_vector2(1) = single_vector[1];
-
-    image_vectors_(i) = single_vector / single_vector.norm();
-    image_vectors_2(i) = single_vector2 / single_vector2.norm();
-  }
-}
-
-bool MPENode::callDetectLed(cv::Mat image){
+bool MPENode::callDetectLed(cv::Mat image, const bool camA){
   region_of_interest_ = cv::Rect(0, 0, image.cols, image.rows);
 
     // Do detection of LEDs in image
   List2DPoints detected_led_positions;
-  distorted_detection_centers_;
+  //distorted_detection_centers_;
 
   LEDDetector::findLeds(image, region_of_interest_, 140, 0.6, 100,
                         40000, 0.5, 0.5,
                         detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
                         camera_distortion_coeffs_, camera_matrix_P_);
   detected_led_positions.size();
-  printf("Nbr of leds: %i\n",(int)detected_led_positions.size());
-  //ROS_WARN("Nobody like sarcasm");
+  /*if(camA)
+    printf("camA- Nbr of leds: %i\n",(int)detected_led_positions.size());
+  else
+    printf("camB- Nbr of leds: %i\n",(int)detected_led_positions.size());*/
 
   if (detected_led_positions.size() >= 2) // If found enough LEDs, Reinitialise
   {
+
     //printf("P1: (%f, %f)\n",(float)detected_led_positions(0)(0),(float)detected_led_positions(0)(1));
     //printf("P2: (%f, %f)\n",(float)detected_led_positions(1)(0),(float)detected_led_positions(1)(1));
-    calculateImageVectors(detected_led_positions);
+    List2DPoints* image_vectors;
+    if(camA)
+      image_vectors = &image_vectorsA_;
+    else
+      image_vectors = &image_vectorsB_;
+    unsigned num_image_points = detected_led_positions.size();
+    (*image_vectors).resize(num_image_points);
+    //image_vectors_2.resize(num_image_points);
+    Eigen::Vector2d single_vector;
+    //Eigen::Vector2d single_vector2;
+
+    for (unsigned i = 0; i < num_image_points; ++i){
+      single_vector(0) = (detected_led_positions(i)(0) - camera_projection_matrix_(0, 2)) / camera_projection_matrix_(0, 0);
+      single_vector(1) = (detected_led_positions(i)(1) - camera_projection_matrix_(1, 2)) / camera_projection_matrix_(1, 1);
+      //single_vector(2) = 1;
+      //single_vector2(0) = single_vector[0];
+      //single_vector2(1) = single_vector[1];
+
+      (*image_vectors)(i) = single_vector / single_vector.norm();
+      //image_vectors_2(i) = single_vector2 / single_vector2.norm();
+    }
   }
   else
   { // Too few LEDs found
@@ -180,12 +187,19 @@ bool MPENode::callDetectLed(cv::Mat image){
 }
 
 
+void MPENode::imageCallbackA(const sensor_msgs::Image::ConstPtr& image_msg){
+  imageCallback(image_msg, true);
+}
+void MPENode::imageCallbackB(const sensor_msgs::Image::ConstPtr& image_msg){
+  imageCallback(image_msg, false);
+}
+
 /**
  * The callback function that is executed every time an image is received. It runs the main logic of the program.
  *
  * \param image_msg the ROS message containing the image to be processed
  */
-void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg)
+void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const bool camA)
 {
 
   // Check whether already received the camera calibration data
@@ -211,50 +225,16 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg)
   // Get time at which the image was taken. This time is used to stamp the estimated pose and also calculate the position of where to search for the makers in the image
   double time_to_predict = image_msg->header.stamp.toSec();
 
-  if (callDetectLed(image)) // Only output the pose, if the pose was updated (i.e. a valid pose was found).
+  if (callDetectLed(image, camA)) // Only output the pose, if the pose was updated (i.e. a valid pose was found).
   {
-    //Eigen::Matrix4d transform = trackable_object.getPredictedPose();
-    /*
-    Matrix6d cov = trackable_object_.getPoseCovariance();
-    Eigen::Matrix4d transform = trackable_object_.getPredictedPose();
+    //If we are the camB we declare that we are ready
+    if(!camA && !camB_ready_)
+        camB_ready_ = true;
 
-    ROS_DEBUG_STREAM("The transform: \n" << transform);
-    ROS_DEBUG_STREAM("The covariance: \n" << cov);
-
-    // Convert transform to PoseWithCovarianceStamped message
-    predicted_pose_.header.stamp = image_msg->header.stamp;
-    predicted_pose_.pose.pose.position.x = transform(0, 3);
-    predicted_pose_.pose.pose.position.y = transform(1, 3);
-    predicted_pose_.pose.pose.position.z = transform(2, 3);
-    Eigen::Quaterniond orientation = Eigen::Quaterniond(transform.block<3, 3>(0, 0));
-    predicted_pose_.pose.pose.orientation.x = orientation.x();
-    predicted_pose_.pose.pose.orientation.y = orientation.y();
-    predicted_pose_.pose.pose.orientation.z = orientation.z();
-    predicted_pose_.pose.pose.orientation.w = orientation.w();
-
-    // Add covariance to PoseWithCovarianceStamped message
-    for (unsigned i = 0; i < 6; ++i)
-    {
-      for (unsigned j = 0; j < 6; ++j)
-      {
-        predicted_pose_.pose.covariance.elems[j + 6 * i] = cov(i, j);
-      }
-    }
-
-    // Publish the pose
-    pose_pub_.publish(predicted_pose_);*/
-
-    
     cv::Mat visualized_image = image.clone();
     cv::cvtColor(visualized_image, visualized_image, CV_GRAY2RGB);
-/*(cv::Mat &image, List2DPoints image_vectors_, const cv::Mat camera_matrix_K,
-                                             const std::vector<double> camera_distortion_coeffs,
-                                             cv::Rect region_of_interest,
-                                             std::vector<cv::Point2f> distorted_detection_centers)*/
-    Visualization::createVisualizationImage(visualized_image, image_vectors_2, camera_matrix_K_, camera_distortion_coeffs_,
+    Visualization::createVisualizationImage(visualized_image, image_vectorsA_, camera_matrix_K_, camera_distortion_coeffs_,
                                           region_of_interest_, distorted_detection_centers_);
-   
-    //trackable_object_.augmentImage(visualized_image);
 
     // Publish image for visualization
     cv_bridge::CvImage visualized_image_msg;
@@ -262,8 +242,42 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg)
     visualized_image_msg.encoding = sensor_msgs::image_encodings::BGR8;
     visualized_image_msg.image = visualized_image;
 
-    image_pub_.publish(visualized_image_msg.toImageMsg());
-    //}
+    if(camA)
+      image_pubA_.publish(visualized_image_msg.toImageMsg());
+    else
+      image_pubB_.publish(visualized_image_msg.toImageMsg());
+
+
+    if(camA && !camB_ready_)
+        ROS_WARN("CamB not linked");
+
+
+    if(camA && camB_ready_){
+        ROS_WARN("Let's shoot data!");
+        Eigen::Vector2d ImageA1(image_vectorsA_(0)(0),  image_vectorsA_(0)(1)); 
+        Eigen::Vector2d ImageA2(image_vectorsA_(1)(0),  image_vectorsA_(1)(1)); 
+
+        Eigen::Vector2d ImageB1(image_vectorsB_(0)(0),  image_vectorsB_(0)(1)); 
+        Eigen::Vector2d ImageB2(image_vectorsB_(1)(0),  image_vectorsB_(1)(1)); 
+        //int fx = camera_matrix_K_[0][0];
+        //int fy = camera_matrix_K_[1][1];
+        Eigen::Vector2d fCam(camera_matrix_K_.at<double>(0, 0), camera_matrix_K_.at<double>(1, 1)); 
+        Eigen::Vector2d pp(camera_matrix_K_.at<double>(0, 2), camera_matrix_K_.at<double>(1, 2)); 
+        double rdA, ldA, rdB, ldB;
+        rdA = 0.1;
+        ldA = rdA;
+        rdB = 0.1;
+        ldB = rdB;
+        Eigen::Vector3d pos(0,0,0);
+        double dist;
+
+        Eigen::MatrixXd rotation = Compute3DMutualLocalisation(ImageA1, ImageA2, ImageB1, ImageB2, pp, pp, fCam, fCam,
+                                                               rdA, ldA, rdB, ldB, &pos, &dist);
+  
+        cout<<"Position: "<<pos<<endl;
+        cout<<"Distance: "<<dist<<endl;
+        //cout<<"Rotation: "<<rotation<<endl;
+    }
   }
   else
   { // If pose was not updated
@@ -294,10 +308,9 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg)
   
 }*/
 
-} // namespace monocular_pose_estimator
 
 
-Eigen::Vector2d ComputePositionMutual(double alpha, double beta, double d){
+Eigen::Vector2d MPENode::ComputePositionMutual(double alpha, double beta, double d){
   double r = 0.5*d/sin(alpha);
   
   // Position of the center
@@ -327,7 +340,7 @@ Eigen::Vector2d ComputePositionMutual(double alpha, double beta, double d){
   return  p;
 }
 
-Eigen::MatrixXd vrrotvec2mat(double p, Eigen::Vector3d r){
+Eigen::MatrixXd MPENode::vrrotvec2mat(double p, Eigen::Vector3d r){
   float s = sin(p);
   float c = cos(p);
   float t = 1 - c;
@@ -350,7 +363,7 @@ Eigen::MatrixXd vrrotvec2mat(double p, Eigen::Vector3d r){
     fCamA = focal caméra A
     rdA = distance de la caméra du point à droite sur le robot A (POSITIF)
 */
-Eigen::MatrixXd Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Eigen::Vector2d ImageA2,
+Eigen::MatrixXd MPENode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Eigen::Vector2d ImageA2,
                                             Eigen::Vector2d ImageB1, Eigen::Vector2d ImageB2,
                                             Eigen::Vector2d ppA, Eigen::Vector2d ppB,
                                             Eigen::Vector2d fCamA, Eigen::Vector2d fCamB,
@@ -432,6 +445,7 @@ Eigen::MatrixXd Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Eigen::Vect
   //cout << "Rotation:\n" << Rotation << endl;
 }
 
+} // namespace monocular_pose_estimator
 
 int main(int argc, char* argv[])
 {
@@ -441,6 +455,7 @@ int main(int argc, char* argv[])
   ros::spin();
 
   return 0;
+  /*
   //Eigen::Matrix<double, 3, 4> m;
   Eigen::Vector2d ImageA1(43.2675,  -230.8107); // En colonne
   Eigen::Vector2d ImageA2(-117.6621,  -184.6691); 
@@ -451,7 +466,7 @@ int main(int argc, char* argv[])
   Eigen::Vector2d ImageA2(516.2996,  -26.9985); 
 
   Eigen::Vector2d ImageB1(144.2211,  56.6879); // En colonne
-  Eigen::Vector2d ImageB2(46.9843,  -19.3582); */
+  Eigen::Vector2d ImageB2(46.9843,  -19.3582); 
   int f = 1000;
   double d = 80;
 
@@ -469,5 +484,5 @@ int main(int argc, char* argv[])
   
   cout<<"Position: "<<pos<<endl;
   cout<<"Distance: "<<dist<<endl;
-  cout<<"Rotation: "<<rotation<<endl;
+  cout<<"Rotation: "<<rotation<<endl;*/
 }
