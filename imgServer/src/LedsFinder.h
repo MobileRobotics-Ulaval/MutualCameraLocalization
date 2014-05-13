@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <vector>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <netdb.h> 
@@ -71,7 +72,7 @@ private:
 
     void* loopRecording();
     void configureProperties();
-    void doThreshold(Image& img, int t);
+    inline void doThreshold(Image& img, int t);
 
    
     bool isRecording();

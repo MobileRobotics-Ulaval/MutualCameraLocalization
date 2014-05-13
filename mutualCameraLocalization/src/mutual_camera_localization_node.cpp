@@ -164,19 +164,13 @@ bool MPENode::callDetectLed(cv::Mat image, const bool camA){
       image_vectors = &image_vectorsB_;
     unsigned num_image_points = detected_led_positions.size();
     (*image_vectors).resize(num_image_points);
-    //image_vectors_2.resize(num_image_points);
     Eigen::Vector2d single_vector;
-    //Eigen::Vector2d single_vector2;
-
+   
     for (unsigned i = 0; i < num_image_points; ++i){
       single_vector(0) = (detected_led_positions(i)(0) - camera_projection_matrix_(0, 2)) / camera_projection_matrix_(0, 0);
       single_vector(1) = (detected_led_positions(i)(1) - camera_projection_matrix_(1, 2)) / camera_projection_matrix_(1, 1);
-      //single_vector(2) = 1;
-      //single_vector2(0) = single_vector[0];
-      //single_vector2(1) = single_vector[1];
-
+    
       (*image_vectors)(i) = single_vector / single_vector.norm();
-      //image_vectors_2(i) = single_vector2 / single_vector2.norm();
     }
   }
   else
@@ -277,6 +271,18 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
         cout<<"Position: "<<pos<<endl;
         cout<<"Distance: "<<dist<<endl;
         //cout<<"Rotation: "<<rotation<<endl;
+
+        predicted_pose_.pose.pose.position.x = pos[0];
+        predicted_pose_.pose.pose.position.y = pos[1];
+        predicted_pose_.pose.pose.position.z = pos[2];
+        Eigen::Quaterniond orientation = Eigen::Quaterniond(rotation.block<3, 3>(0, 0));
+        
+        predicted_pose_.pose.pose.orientation.x = orientation.x();
+        predicted_pose_.pose.pose.orientation.y = orientation.y();
+        predicted_pose_.pose.pose.orientation.z = orientation.z();
+        predicted_pose_.pose.pose.orientation.w = orientation.w();
+
+        pose_pub_.publish(predicted_pose_);
     }
   }
   else

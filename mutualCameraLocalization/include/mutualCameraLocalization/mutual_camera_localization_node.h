@@ -78,7 +78,7 @@ private:
   sensor_msgs::CameraInfo cam_info_; //!< Variable to store the camera calibration parameters
 
   //PoseEstimator trackable_object_; //!< Declaration of the object whose pose will be estimated
-  
+  geometry_msgs::PoseWithCovarianceStamped predicted_pose_;
   cv::Rect region_of_interest_;
   cv::Mat camera_matrix_K_; //!< Variable to store the camera matrix as an OpenCV matrix
   cv::Mat camera_matrix_P_; //!< Variable to store the projection matrix (as an OpenCV matrix) that projects points onto the rectified image plane.

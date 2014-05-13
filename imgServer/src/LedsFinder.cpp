@@ -20,7 +20,7 @@ LedsFinder::LedsFinder(int port, int t, float s, int b, int e, float g) : port(p
 /**
     Pass a raw image throught a threshold
 */
-void LedsFinder::doThreshold(Image& Img, int t){
+inline void LedsFinder::doThreshold(Image& Img, int t){
 	unsigned char* p = Img.GetData();
 	unsigned int size = Img.GetDataSize();
 	for(int i = 0; i < size; i++){
@@ -45,38 +45,14 @@ void LedsFinder::takeRawPicture(int nbrPic, int threshold){
     unsigned char* izBuff = (unsigned char*)malloc(WIDTH * HEIGHT);
     unsigned char* decod = (unsigned char*)malloc(WIDTH * HEIGHT);
 	for (int i=0; i < nbrPic; i++){
-        //typedef std::chrono::steady_clock::time_point times_t ;
-        //typedef std::chrono::duration<int,std::milli> millisecs_t ;
-        //times_t t1 = std::chrono::steady_clock::now();
-
 		Error err = cam.RetrieveBuffer( &rawImage );
-        //times_t t2 = std::chrono::steady_clock::now();
-		//if(i%2==0)
-		//sprintf(Filename,"../raw/Im%dNT.png",i);
-		//rawImage.Save(Filename,&pngOption);     
 		this->doThreshold(rawImage, threshold);
-        //times_t t3 = std::chrono::steady_clock::now();
-		//printf("image %d, code erreur %s\n",i, err.GetDescription());
-		//sprintf(Filename,"../raw/Im%dT.png",i);
-		//rawImage.Save(Filename,&pngOption); 
-        //compressToPNG(pngBuf, &pngSize, rawImage.GetData(), rawImage.GetDataSize());
         int e = LZ4_compress((char*)(void*)(rawImage.GetData()), (char*)(void*)(izBuff), rawImage.GetDataSize());
         printf("Size =%i\n", e);
-        //times_t t4 = std::chrono::steady_clock::now();
-        
-        //int d1 = (new millisecs_t( std::chrono::duration_cast<millisecs_t>(t2-t1) ))->count();
-        //int d2 = (new millisecs_t( std::chrono::duration_cast<millisecs_t>(t3-t2) ))->count();
-        //int d3 = (new millisecs_t( std::chrono::duration_cast<millisecs_t>(t4-t3) ))->count();
-
-       // int d4 = d1 + d2 + d3;
-        //printf("Retrieve cam: %ims \nThreshold: %ims \nCompresse: %ims\nTotal: %ims\n", d1, d2, d3, d4);
-        //free(pngBuf);
         int sizeDecom = LZ4_decompress_safe((char*)(void*)(izBuff), (char*)(void*)(decod), e, WIDTH * HEIGHT);
         printf("Sizedecod =%i\n", sizeDecom);
         compressToPNG(pngBuf, &pngSize, decod, sizeDecom);    
         saveFilePNG(*pngBuf, pngSize, "camarche.png");
-
- 
 	} 
 	this->stopRecording();
 
@@ -213,16 +189,11 @@ void LedsFinder::setRecording(bool r){
    It takes, compress and sends picture
 */
 void* LedsFinder::loopRecording(){
-   // typedef std::chrono::steady_clock::time_point times_t ;
-    ///typedef std::chrono::duration<int,std::milli> millisecs_t ;
-
-    //unsigned char** pngBuf = new unsigned char*();
-    //size_t pngSize;
-
     Image rawImage;
     int sizeLz4;
     int i = 0;
     int d1, d2, d3, d4;
+    struct timeval t1, t2, t3, t4;
     //times_t t1, t2, t3, t4;
 
     unsigned char* izBuff = (unsigned char*)malloc(WIDTH * HEIGHT);
@@ -232,20 +203,24 @@ void* LedsFinder::loopRecording(){
     if(this->startRecording() == 0){
         while(isRecording()){
             //t1 = std::chrono::steady_clock::now();
+            gettimeofday(&t1, 0);
 
             pthread_mutex_lock(&proprietyMux);
             Error err = cam.RetrieveBuffer( &rawImage );
             //t2 = std::chrono::steady_clock::now();
+            gettimeofday(&t2, 0);
 
             this->doThreshold(rawImage, threshold);
             pthread_mutex_unlock(&proprietyMux);
            // t3 = std::chrono::steady_clock::now();
+            gettimeofday(&t3, 0);
 
             //compressToPNG(pngBuf, &pngSize, rawImage.GetData(), rawImage.GetDataSize());
             sizeLz4 = LZ4_compress((char*)(void*)(rawImage.GetData()), (char*)(void*)(izBuff), rawImage.GetDataSize());
            // t4 = std::chrono::steady_clock::now();
+            gettimeofday(&t4, 0);
             
-           // d1 = (new millisecs_t( std::chrono::duration_cast<millisecs_t>(t2-t1) ))->count();
+           //d1 = (new millisecs_t( std::chrono::duration_cast<millisecs_t>(t2-t1) ))->count();
             //d2 = (new millisecs_t( std::chrono::duration_cast<millisecs_t>(t3-t2) ))->count();
             ///d3 = (new millisecs_t( std::chrono::duration_cast<millisecs_t>(t4-t3) ))->count();
 
@@ -253,6 +228,11 @@ void* LedsFinder::loopRecording(){
            // printf("#%i - Retrieve cam: %ims \nThreshold: %ims \nCompresse: %ims\nTotal: %ims\n size: %i Octets\n", i, d1, d2, d3, d4, sizeIz4);
             i++;
             sendProto(dataToProto(rawImage.GetTimeStamp().seconds, rawImage.GetTimeStamp().microSeconds, izBuff, sizeLz4));
+            long elapsed1 = (t2.tv_sec-t1.tv_sec)*1000000 + t2.tv_usec-t1.tv_usec;
+            long elapsed2 = (t3.tv_sec-t2.tv_sec)*1000000 + t3.tv_usec-t2.tv_usec;
+            long elapsed3 = (t4.tv_sec-t3.tv_sec)*1000000 + t4.tv_usec-t3.tv_usec;
+            
+            printf("Time pass: \n%i\n%i\n%i\n", elapsed1 ,elapsed2, elapsed3);
             //sendProto(dataToProto(rawImage.GetTimeStamp().seconds, rawImage.GetTimeStamp().microSeconds, *pngBuf, pngSize));
             
 
