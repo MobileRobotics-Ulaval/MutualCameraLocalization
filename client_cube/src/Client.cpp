@@ -7,9 +7,10 @@ using namespace std;
 /**
     Initiation of the client socket
 */
-Client::Client(string hostName, int port): recording(false){
+Client::Client(string cubeid, string hostName, int port): recording(false){
     image_transport::ImageTransport it(nh);
-    pub = it.advertiseCamera("/camera/image_raw", 1);
+    pub = it.advertiseCamera("/camera" + cubeid + "/image_raw", 1);
+    //pub = it.advertiseCamera("/camera/image_raw", 1);
     //pub = nh.advertise<sensor_msgs::Image>("/cube_feed_topic", 1);
     //if(!nh.ok()){
     //    printf("Not ok");
@@ -110,14 +111,24 @@ int Client::startListeningLoop(){
             sendCommand(d);
         }
         else if(i == 5){ 
-            if(!isRecording()){
-                dotCapture::Command d;
+            dotCapture::Command d;
+            // In case we are still recording.
+            if(isRecording()){
+                d.add_option()->set_type(dotCapture::Command::STOP_RECORDING);
+                sendCommand(d);
+                dotCapture::Command d2;
+                d2.add_option()->set_type(dotCapture::Command::DISCONNECT);
+                sendCommand(d2);
+                setRecording(false);
+
+                printf("Join imgGathering thread...\n");
+                pthread_join(imgGathering, NULL);
+            }
+            else{
                 d.add_option()->set_type(dotCapture::Command::DISCONNECT);
                 sendCommand(d);
-                flag = false;
             }
-            else
-                printf("Stop recording before quitting!\n");
+            flag = false;
 
         }
 

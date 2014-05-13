@@ -11,6 +11,9 @@ LedsFinder::LedsFinder(int port, int t, float s, int b, int e, float g) : port(p
     ClientAddress.sin_family = AF_INET;
     ClientAddress.sin_addr.s_addr = INADDR_ANY;
     ClientAddress.sin_port = htons(port);
+
+    //pthread_cancel(imgGathering);
+    pthread_mutex_unlock(&recordingMux);
 }
 
 
@@ -187,16 +190,22 @@ void LedsFinder::startProcessingLoop(){
 */
 bool LedsFinder::isRecording(){
     bool r;
+    //printf("[isrecord");
     pthread_mutex_lock(&recordingMux);
     r = recording;
+    //printf("u");
     pthread_mutex_unlock(&recordingMux);
+    //printf("]\n");
     return r;
 }
 
 void LedsFinder::setRecording(bool r){
+   // printf("[setrecord");
     pthread_mutex_lock(&recordingMux);
     recording = r;
+    //printf("u");
     pthread_mutex_unlock(&recordingMux);
+    //printf("]\n");
 }
 
 /*

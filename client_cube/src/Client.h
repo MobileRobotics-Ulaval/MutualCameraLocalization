@@ -61,7 +61,7 @@ private:
     ros::NodeHandle nh;
     image_transport::CameraPublisher pub;
 public:
-	Client(std::string hostName, int port);
+	Client(std::string cubeid, std::string hostName, int port);
 	int startListeningLoop();
 	int sendCommand(dotCapture::Command &com);
     void* receivingImgLoop();

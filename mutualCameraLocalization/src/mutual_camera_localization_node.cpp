@@ -12,7 +12,7 @@
  *
  */
 using namespace std;
-#include "mutualCameraLocalization/monocular_pose_estimator_node.h"
+#include "mutualCameraLocalization/mutual_camera_localization_node.h"
 
 namespace monocular_pose_estimator
 {
@@ -30,8 +30,8 @@ MPENode::MPENode()
   //dr_server_.setCallback(cb_);
 
   // Initialize subscribers
-  image_sub_ = nh_.subscribe("/camera/image_raw", 1, &MPENode::imageCallback, this);
-  camera_info_sub_ = nh_.subscribe("/camera/camera_info", 1, &MPENode::cameraInfoCallback, this);
+  image_sub_ = nh_.subscribe("/cameraA/image_raw", 1, &MPENode::imageCallback, this);
+  camera_info_sub_ = nh_.subscribe("/cameraA/camera_info", 1, &MPENode::cameraInfoCallback, this);
 
   // Initialize pose publisher
   pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("estimated_pose", 1);
@@ -435,7 +435,7 @@ Eigen::MatrixXd Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Eigen::Vect
 
 int main(int argc, char* argv[])
 {
-  ros::init(argc, argv, "monocular_pose_tracker");
+  ros::init(argc, argv, "mutual_camera_localization");
 
   monocular_pose_estimator::MPENode mpe_node;
   ros::spin();

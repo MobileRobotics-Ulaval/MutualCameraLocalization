@@ -37,11 +37,8 @@ include_directories(
 
 # make the executable
 add_executable(mutual_camera_localization 
-  src/monocular_pose_estimator_node.cpp 
-#  src/pose_estimator.cpp 
-#  src/p3p.cpp 
+  src/mutual_camera_localization_node.cpp 
   src/led_detector.cpp 
-#  src/combinations.cpp
   src/visualization.cpp
 )
 
