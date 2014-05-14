@@ -14,7 +14,7 @@
 #include "ros/ros.h"
 #include "mutualCameraLocalization/led_detector.h"
 
-namespace monocular_pose_estimator
+namespace mutual_camera_localizator
 {
 
 typedef Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> List2DPoints; //!< A dynamic column vector containing Vector2D elements. \see Vector2d

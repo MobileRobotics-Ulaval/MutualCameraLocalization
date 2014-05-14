@@ -1,17 +1,19 @@
 /*
- * monocular_pose_estimator_node.h
+ * mutual_camera_localizator_node.h
  *
  *  Created on: Mar 26, 2014
  *      Author: Matthias Fässler
+ *  Edited on:  May 14 2014
+ *      Author: Philippe Bbin
  */
 
-/** \file monocular_pose_estimator_node.h
- * \brief File containing the definition of the Monocular Pose Estimator Node class
+/** \file mutual_camera_localizator_node.h
+ * \brief File containing the definition of the Mutual Camera Localizator Node class
  *
  */
 
-#ifndef MONOCULAR_POSE_ESTIMATOR_NODE_H_
-#define MONOCULAR_POSE_ESTIMATOR_NODE_H_
+#ifndef MUTUAL_CAMERA_LOCALIZATOR_NODE_H_
+#define MUTUAL_CAMERA_LOCALIZATOR_NODE_H_
 
 #include "ros/ros.h"
 
@@ -19,7 +21,8 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/image_encodings.h>
 
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <visualization_msgs/Marker.h>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
@@ -30,13 +33,13 @@
 #include <opencv/highgui.h>
 
 #include <dynamic_reconfigure/server.h>
-//#include <monocular_pose_estimator/MonocularPoseEstimatorConfig.h>
+//#include <mutual_camera_localizator/MonocularPoseEstimatorConfig.h>
 #include <mutualCameraLocalization/led_detector.h>
 #include <mutualCameraLocalization/visualization.h>
 
-//#include "monocular_pose_estimator/pose_estimator.h"
+//#include "mutual_camera_localizator/pose_estimator.h"
 
-namespace monocular_pose_estimator
+namespace mutual_camera_localizator
 {
 typedef Eigen::Matrix<double, 6, 6> Matrix6d; //!< A 6x6 matrix of doubles
 typedef Eigen::Matrix<double, 2, 6> Matrix2x6d; //!< A 2x6 matrix of doubles
@@ -54,7 +57,7 @@ typedef Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> List2DPoints; //!< A d
 typedef Eigen::Matrix<Eigen::Vector3d, Eigen::Dynamic, 1> List3DPoints; //!< A dynamic column vector containing Vector3D elements. \see Vector3d
 typedef Eigen::Matrix<Eigen::Vector4d, Eigen::Dynamic, 1> List4DPoints; //!< A dynamic column vector containing Vector4D elements. \see Vector4d
 
-class MPENode
+class MCLNode
 {
 private:
 
@@ -68,8 +71,8 @@ private:
   ros::Subscriber image_subB_; //!< The ROS subscriber to the raw camera image B
   ros::Subscriber camera_info_sub_; //!< The ROS subscriber to the camera info
 
-  //dynamic_reconfigure::Server<monocular_pose_estimator::MonocularPoseEstimatorConfig> dr_server_; //!< The dynamic reconfigure server
-  //dynamic_reconfigure::Server<monocular_pose_estimator::MonocularPoseEstimatorConfig>::CallbackType cb_; //!< The dynamic reconfigure callback type
+  //dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig> dr_server_; //!< The dynamic reconfigure server
+  //dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig>::CallbackType cb_; //!< The dynamic reconfigure callback type
 
   //geometry_msgs::PoseWithCovarianceStamped predicted_pose_; //!< The ROS message variable for the estimated pose and covariance of the object
 
@@ -78,7 +81,9 @@ private:
   sensor_msgs::CameraInfo cam_info_; //!< Variable to store the camera calibration parameters
 
   //PoseEstimator trackable_object_; //!< Declaration of the object whose pose will be estimated
-  geometry_msgs::PoseWithCovarianceStamped predicted_pose_;
+  //geometry_msgs::PoseWithCovarianceStamped predicted_pose_;
+  //geometry_msgs::PoseStamped predicted_pose_;
+  visualization_msgs::Marker marker_pose_;
   cv::Rect region_of_interest_;
   cv::Mat camera_matrix_K_; //!< Variable to store the camera matrix as an OpenCV matrix
   cv::Mat camera_matrix_P_; //!< Variable to store the projection matrix (as an OpenCV matrix) that projects points onto the rectified image plane.
@@ -90,14 +95,16 @@ private:
   //List2DPoints image_vectors_2;
 public:
 
-  MPENode();
-  ~MPENode();
+  MCLNode();
+  ~MCLNode();
   void imageCallbackA(const sensor_msgs::Image::ConstPtr& image_msg);
   void imageCallbackB(const sensor_msgs::Image::ConstPtr& image_msg);
   void cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
 
   void imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const bool camA);
   bool callDetectLed(cv::Mat image, const bool camA);
+
+  void initMarker();
 
 
   Eigen::Vector2d ComputePositionMutual(double alpha, double beta, double d);
@@ -109,11 +116,11 @@ public:
                                             double rdA, double ldA, double rdB, double ldB,
                                             Eigen::Vector3d* pos, double* dist);
 
-  //void dynamicParametersCallback(monocular_pose_estimator::MonocularPoseEstimatorConfig &config, uint32_t level);
+  //void dynamicParametersCallback(mutual_camera_localizator::MonocularPoseEstimatorConfig &config, uint32_t level);
 
   //void calculateImageVectors(List2DPoints image_points);
 };
 
-} // monocular_pose_estimator namespace
+} // mutual_camera_localizator_node namespace
 
-#endif /* MONOCULAR_POSE_ESTIMATOR_NODE_H_ */
+#endif /* MUTAL_CAMERA_LOCALIZATOR_NODE_H_ */

@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include "ros/ros.h"
 
-namespace monocular_pose_estimator
+namespace mutual_camera_localizator
 {
 
 // Function that projects the RGB orientation vectors back onto the image

@@ -1,11 +1,13 @@
 /*
- * monocular_pose_estimator.cpp
+ * mutual_camera_localizator_node.cpp
  *
  * Created on: Jul 29, 2013
- * Author: Karl Schwabe
+ *      Author: Karl Schwabe
+ *  Edited on:  May 14 2014
+ *      Author: Philippe Bbin
  */
 
-/** \file monocular_pose_estimator_node.cpp
+/** \file mutual_camera_localizator_node.cpp
  * \brief File containing the main function of the package
  *
  * This file is responsible for the flow of the program.
@@ -14,28 +16,31 @@
 using namespace std;
 #include "mutualCameraLocalization/mutual_camera_localization_node.h"
 
-namespace monocular_pose_estimator
+namespace mutual_camera_localizator
 {
 
 /**
  * Constructor of the Monocular Pose Estimation Node class
  *
  */
-MPENode::MPENode():camB_ready_(false)
+MCLNode::MCLNode():camB_ready_(false)
 {
   // Set up a dynamic reconfigure server.
   // This should be done before reading parameter server values.
-  //dynamic_reconfigure::Server<monocular_pose_estimator::MonocularPoseEstimatorConfig>::CallbackType cb_;
-  //cb_ = boost::bind(&MPENode::dynamicParametersCallback, this, _1, _2);
+  //dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig>::CallbackType cb_;
+  //cb_ = boost::bind(&MCLNode::dynamicParametersCallback, this, _1, _2);
   //dr_server_.setCallback(cb_);
 
   // Initialize subscribers
-  image_subA_ = nh_.subscribe("/cameraA/image_raw", 1, &MPENode::imageCallbackA, this);
-  image_subB_ = nh_.subscribe("/cameraB/image_raw", 1, &MPENode::imageCallbackB, this);
-  camera_info_sub_ = nh_.subscribe("/cameraA/camera_info", 1, &MPENode::cameraInfoCallback, this);
+  image_subA_ = nh_.subscribe("/cameraA/image_raw", 1, &MCLNode::imageCallbackA, this);
+  image_subB_ = nh_.subscribe("/cameraB/image_raw", 1, &MCLNode::imageCallbackB, this);
+  camera_info_sub_ = nh_.subscribe("/cameraA/camera_info", 1, &MCLNode::cameraInfoCallback, this);
 
   // Initialize pose publisher
-  pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("estimated_pose", 1);
+  //pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("estimated_pose", 1);
+  pose_pub_ = nh_.advertise<visualization_msgs::Marker>("estimated_pose", 1);
+  initMarker();
+
 
   // Initialize image publisher for visualization
   image_transport::ImageTransport image_transport(nh_);
@@ -75,7 +80,7 @@ MPENode::MPENode():camB_ready_(false)
  * Destructor of the Monocular Pose Estimation Node class
  *
  */
-MPENode::~MPENode()
+MCLNode::~MCLNode()
 {
 
 }
@@ -86,7 +91,7 @@ MPENode::~MPENode()
  * \param msg the ROS message containing the camera calibration information
  *
  */
-void MPENode::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
+void MCLNode::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
   if (!have_camera_info_)
   {
     cam_info_ = *msg;
@@ -133,9 +138,9 @@ void MPENode::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 
 }
 
-//void MPENode::calculateImageVectors(List2DPoints image_points){}
+//void MCLNode::calculateImageVectors(List2DPoints image_points){}
 
-bool MPENode::callDetectLed(cv::Mat image, const bool camA){
+bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
   region_of_interest_ = cv::Rect(0, 0, image.cols, image.rows);
 
     // Do detection of LEDs in image
@@ -181,10 +186,10 @@ bool MPENode::callDetectLed(cv::Mat image, const bool camA){
 }
 
 
-void MPENode::imageCallbackA(const sensor_msgs::Image::ConstPtr& image_msg){
+void MCLNode::imageCallbackA(const sensor_msgs::Image::ConstPtr& image_msg){
   imageCallback(image_msg, true);
 }
-void MPENode::imageCallbackB(const sensor_msgs::Image::ConstPtr& image_msg){
+void MCLNode::imageCallbackB(const sensor_msgs::Image::ConstPtr& image_msg){
   imageCallback(image_msg, false);
 }
 
@@ -193,7 +198,7 @@ void MPENode::imageCallbackB(const sensor_msgs::Image::ConstPtr& image_msg){
  *
  * \param image_msg the ROS message containing the image to be processed
  */
-void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const bool camA)
+void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const bool camA)
 {
 
   // Check whether already received the camera calibration data
@@ -247,7 +252,7 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
 
 
     if(camA && camB_ready_){
-        ROS_WARN("Let's shoot data!");
+        //ROS_WARN("Let's shoot data!");
         Eigen::Vector2d ImageA1(image_vectorsA_(0)(0),  image_vectorsA_(0)(1)); 
         Eigen::Vector2d ImageA2(image_vectorsA_(1)(0),  image_vectorsA_(1)(1)); 
 
@@ -267,22 +272,25 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
 
         Eigen::MatrixXd rotation = Compute3DMutualLocalisation(ImageA1, ImageA2, ImageB1, ImageB2, pp, pp, fCam, fCam,
                                                                rdA, ldA, rdB, ldB, &pos, &dist);
-  
-        cout<<"Position: "<<pos<<endl;
-        cout<<"Distance: "<<dist<<endl;
+        //cout<<"fCam: "<<fCam<<endl;
+        //cout<<"pp: "<<pp<<endl;
+        //cout<<"Position: "<<pos<<endl;
+        //cout<<"Distance: "<<dist<<endl;
         //cout<<"Rotation: "<<rotation<<endl;
 
-        predicted_pose_.pose.pose.position.x = pos[0];
-        predicted_pose_.pose.pose.position.y = pos[1];
-        predicted_pose_.pose.pose.position.z = pos[2];
-        Eigen::Quaterniond orientation = Eigen::Quaterniond(rotation.block<3, 3>(0, 0));
-        
-        predicted_pose_.pose.pose.orientation.x = orientation.x();
-        predicted_pose_.pose.pose.orientation.y = orientation.y();
-        predicted_pose_.pose.pose.orientation.z = orientation.z();
-        predicted_pose_.pose.pose.orientation.w = orientation.w();
+        marker_pose_.header.stamp = ros::Time::now();
 
-        pose_pub_.publish(predicted_pose_);
+        marker_pose_.pose.position.x = pos[0];
+        marker_pose_.pose.position.y = pos[1];
+        marker_pose_.pose.position.z = pos[2];
+        //Eigen::Quaterniond orientation = Eigen::Quaterniond(rotation.block<3, 3>(0, 0));
+        
+        //predicted_pose_.pose.pose.orientation.x = orientation.x();
+       // predicted_pose_.pose.pose.orientation.y = orientation.y();
+        //predicted_pose_.pose.pose.orientation.z = orientation.z();
+       // predicted_pose_.pose.pose.orientation.w = orientation.w();
+
+        pose_pub_.publish(marker_pose_);
     }
   }
   else
@@ -291,10 +299,27 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
   }
 }
 
+void MCLNode::initMarker(){
+    marker_pose_.header.frame_id = "/cube";
+    marker_pose_.id = 0;
+    marker_pose_.type = visualization_msgs::Marker::CUBE;
+    marker_pose_.lifetime = ros::Duration();
+
+    marker_pose_.action = visualization_msgs::Marker::ADD;
+    marker_pose_.scale.x = 10;
+    marker_pose_.scale.y = 10;
+    marker_pose_.scale.z = 10;
+
+    marker_pose_.color.r = 0.0f;
+    marker_pose_.color.g = 1.0f;
+    marker_pose_.color.b = 0.0f;
+    marker_pose_.color.a = 1.0;
+}
+
 /**
  * The dynamic reconfigure callback function. This function updates the variable within the program whenever they are changed using dynamic reconfigure.
  */
-/*void MPENode::dynamicParametersCallback(monocular_pose_estimator::MonocularPoseEstimatorConfig &config, uint32_t level)
+/*void MCLNode::dynamicParametersCallback(mutual_camera_localizator::MonocularPoseEstimatorConfig &config, uint32_t level)
 {
   
   trackable_object_.detection_threshold_value_ = config.threshold_value;
@@ -316,7 +341,7 @@ void MPENode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
 
 
 
-Eigen::Vector2d MPENode::ComputePositionMutual(double alpha, double beta, double d){
+Eigen::Vector2d MCLNode::ComputePositionMutual(double alpha, double beta, double d){
   double r = 0.5*d/sin(alpha);
   
   // Position of the center
@@ -346,7 +371,7 @@ Eigen::Vector2d MPENode::ComputePositionMutual(double alpha, double beta, double
   return  p;
 }
 
-Eigen::MatrixXd MPENode::vrrotvec2mat(double p, Eigen::Vector3d r){
+Eigen::MatrixXd MCLNode::vrrotvec2mat(double p, Eigen::Vector3d r){
   float s = sin(p);
   float c = cos(p);
   float t = 1 - c;
@@ -369,7 +394,7 @@ Eigen::MatrixXd MPENode::vrrotvec2mat(double p, Eigen::Vector3d r){
     fCamA = focal caméra A
     rdA = distance de la caméra du point à droite sur le robot A (POSITIF)
 */
-Eigen::MatrixXd MPENode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Eigen::Vector2d ImageA2,
+Eigen::MatrixXd MCLNode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Eigen::Vector2d ImageA2,
                                             Eigen::Vector2d ImageB1, Eigen::Vector2d ImageB2,
                                             Eigen::Vector2d ppA, Eigen::Vector2d ppB,
                                             Eigen::Vector2d fCamA, Eigen::Vector2d fCamB,
@@ -451,13 +476,13 @@ Eigen::MatrixXd MPENode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Ei
   //cout << "Rotation:\n" << Rotation << endl;
 }
 
-} // namespace monocular_pose_estimator
+} // namespace mutual_camera_localizator_node
 
 int main(int argc, char* argv[])
 {
   ros::init(argc, argv, "mutual_camera_localization");
 
-  monocular_pose_estimator::MPENode mpe_node;
+  mutual_camera_localizator::MCLNode mpe_node;
   ros::spin();
 
   return 0;

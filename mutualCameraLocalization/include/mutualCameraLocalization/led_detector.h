@@ -18,7 +18,7 @@
 #include <Eigen/Dense>
 #include <algorithm>
 
-namespace monocular_pose_estimator
+namespace mutual_camera_localizator
 {
 
 typedef Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> List2DPoints;
