@@ -23,7 +23,7 @@ namespace mutual_camera_localizator
  * Constructor of the Monocular Pose Estimation Node class
  *
  */
-MCLNode::MCLNode():camB_ready_(false)
+MCLNode::MCLNode()
 {
   // Set up a dynamic reconfigure server.
   // This should be done before reading parameter server values.
@@ -222,13 +222,14 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
   cv::Mat image = cv_ptr->image;
 
   // Get time at which the image was taken. This time is used to stamp the estimated pose and also calculate the position of where to search for the makers in the image
-  double time_to_predict = image_msg->header.stamp.toSec();
+  //double time_to_predict = image_msg->header.stamp.toSec();
 
   if (callDetectLed(image, camA)) // Only output the pose, if the pose was updated (i.e. a valid pose was found).
   {
+    bool camB_ready = image_msg->header.stamp - camB_time_ <= diffMax;
     //If we are the camB we declare that we are ready
-    if(!camA && !camB_ready_)
-        camB_ready_ = true;
+    if(!camA)
+        camB_time_ = image_msg->header.stamp;
 
     cv::Mat visualized_image = image.clone();
     cv::cvtColor(visualized_image, visualized_image, CV_GRAY2RGB);
@@ -247,11 +248,11 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
       image_pubB_.publish(visualized_image_msg.toImageMsg());
 
 
-    if(camA && !camB_ready_)
-        ROS_WARN("CamB not linked");
+    if(camA && !camB_ready)
+        ROS_WARN("CamB delay too long: %li", (image_msg->header.stamp - camB_time_).toSec());
 
 
-    if(camA && camB_ready_){
+    if(camA && camB_ready){
         //ROS_WARN("Let's shoot data!");
         Eigen::Vector2d ImageA1(image_vectorsA_(0)(0),  image_vectorsA_(0)(1)); 
         Eigen::Vector2d ImageA2(image_vectorsA_(1)(0),  image_vectorsA_(1)(1)); 

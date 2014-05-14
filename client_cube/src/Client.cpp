@@ -255,6 +255,7 @@ void* Client::receivingImgLoop(){
         codedIn.PopLimit(msgLimit);
 
 
+        printf("Timestamp: %i\n Micro: %i\n", message.timestamp(), message.timestamp_microsec());
         data = (unsigned char*)(const void *)message.mutable_image()->c_str();
 
         sizeLz4 = LZ4_decompress_safe((char*)(void*)(data), (char*)(void*)(iz4BuffDecod), message.mutable_image()->size(), WIDTH * HEIGHT);
@@ -263,15 +264,9 @@ void* Client::receivingImgLoop(){
         cvSetData(pImg, iz4BuffDecod, pImg->widthStep);
 
         cv_image.image = pImg;
+        cv_image.header.stamp = ros::Time::now();
 
         cv_image.toImageMsg(ros_image);
-/*void    publish (const sensor_msgs::Image &image, const sensor_msgs::CameraInfo &info) const
-    Publish an (image, info) pair on the topics associated with this CameraPublisher.
-void    publish (const sensor_msgs::ImageConstPtr &image, const sensor_msgs::CameraInfoConstPtr &info) const
-    Publish an (image, info) pair on the topics associated with this CameraPublisher.
-void    publish (sensor_msgs::Image &image, sensor_msgs::CameraInfo &info, ros::Time stamp) const
-    Publish an (image, info) pair with given timestamp on the topics associated with this CameraPublisher. */
-        
         pub.publish(ros_image, ros_camInfo);
 
         //compressToPNG(pngBuf, &pngSize, iz4BuffDecod, sizeLz4);

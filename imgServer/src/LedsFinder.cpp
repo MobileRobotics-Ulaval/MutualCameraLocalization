@@ -13,9 +13,31 @@ LedsFinder::LedsFinder(int port, int t, float s, int b, int e, float g) : port(p
     ClientAddress.sin_port = htons(port);
 
     //pthread_cancel(imgGathering);
-    pthread_mutex_unlock(&recordingMux);
+    //pthread_mutex_unlock(&recordingMux);
 }
+/**
+    Reduce the resolution of an image by a factor 2
+*/
+inline void LedsFinder::divByTwoRes(unsigned char* p, unsigned char* c, int w, int h){
+    int nw = w/2;
+    int nh = h/2;
+    //unsigned char* c = (unsigned char*)malloc(w * h/4);
 
+    printf("%i\n", 2 * 200 * h + 2 * 100);
+    printf("%i\n", 2 * 200 * h + 2 * 100 + 1);
+    printf("%i\n", (2 * 200 + 1) * h + 2 * 100);
+    printf("%i\n", (2 * 200 + 1) * h + 2 * 100 + 1);
+    for(int i = 0; i < nw; i++){
+        for(int j = 0; j < nh; j++){// Way too slow
+            //printf("%i\n", (2 * i * w + 2 * j));
+            c[j * nw + i]  =(p[2 * j * w + 2 * i] +
+                             p[2 * j * w + 2 * i + 1] +
+                             p[(2 * j + 1) * w + 2 * i] +
+                             p[(2 * j + 1) * w + 2 * i + 1])/4;
+        }
+    }
+   // p = c;
+}
 
 /**
     Pass a raw image throught a threshold
@@ -39,20 +61,26 @@ void LedsFinder::takeRawPicture(int nbrPic, int threshold){
 	pngOption.compressionLevel = 0;
 
 	this->startRecording();
-
     unsigned char** pngBuf = new unsigned char*();
     size_t pngSize;
     unsigned char* izBuff = (unsigned char*)malloc(WIDTH * HEIGHT);
     unsigned char* decod = (unsigned char*)malloc(WIDTH * HEIGHT);
+    unsigned char* res = (unsigned char*)malloc(WIDTH * HEIGHT/4);
+
 	for (int i=0; i < nbrPic; i++){
 		Error err = cam.RetrieveBuffer( &rawImage );
-		this->doThreshold(rawImage, threshold);
-        int e = LZ4_compress((char*)(void*)(rawImage.GetData()), (char*)(void*)(izBuff), rawImage.GetDataSize());
+        printf("fuck");
+		doThreshold(rawImage, threshold);
+        divByTwoRes(rawImage.GetData(), res, WIDTH, HEIGHT);
+
+        
+        int e = LZ4_compress((char*)(void*)(res), (char*)(void*)(izBuff), rawImage.GetDataSize()/4);
+
         printf("Size =%i\n", e);
-        int sizeDecom = LZ4_decompress_safe((char*)(void*)(izBuff), (char*)(void*)(decod), e, WIDTH * HEIGHT);
-        printf("Sizedecod =%i\n", sizeDecom);
-        compressToPNG(pngBuf, &pngSize, decod, sizeDecom);    
-        saveFilePNG(*pngBuf, pngSize, "camarche.png");
+        int sizeDecom = LZ4_decompress_safe((char*)(void*)(izBuff), (char*)(void*)(decod), e, WIDTH * HEIGHT/4);
+        printf("Sizedecod =%i\n", sizeDecom);    
+        compressToPNG(pngBuf, &pngSize, decod, WIDTH/2, HEIGHT/2);    
+        saveFilePNG(*pngBuf, pngSize, "camarche2.png");
 	} 
 	this->stopRecording();
 
@@ -193,10 +221,12 @@ void* LedsFinder::loopRecording(){
     int sizeLz4;
     int i = 0;
     int d1, d2, d3, d4;
-    struct timeval t1, t2, t3, t4;
+    struct timeval t1, t2, t3, t4, t5;
+    long elapsed1, elapsed2, elapsed3, elapsed4;
     //times_t t1, t2, t3, t4;
 
-    unsigned char* izBuff = (unsigned char*)malloc(WIDTH * HEIGHT);
+    unsigned char* izBuff = (unsigned char*)malloc(WIDTH * HEIGHT/4);
+    unsigned char* res = (unsigned char*)malloc(WIDTH * HEIGHT/4);
     //unsigned char* decod = (unsigned char*)malloc(WIDTH * HEIGHT);
     
     // If the camera is not connected, the thread is stop
@@ -215,10 +245,13 @@ void* LedsFinder::loopRecording(){
            // t3 = std::chrono::steady_clock::now();
             gettimeofday(&t3, 0);
 
-            //compressToPNG(pngBuf, &pngSize, rawImage.GetData(), rawImage.GetDataSize());
-            sizeLz4 = LZ4_compress((char*)(void*)(rawImage.GetData()), (char*)(void*)(izBuff), rawImage.GetDataSize());
-           // t4 = std::chrono::steady_clock::now();
+            divByTwoRes(rawImage.GetData(), res, WIDTH, HEIGHT);
             gettimeofday(&t4, 0);
+
+            //compressToPNG(pngBuf, &pngSize, rawImage.GetData(), rawImage.GetDataSize());
+            sizeLz4 = LZ4_compress((char*)(void*)(res), (char*)(void*)(izBuff), WIDTH * HEIGHT/4);
+           // t4 = std::chrono::steady_clock::now();
+            gettimeofday(&t5, 0);
             
            //d1 = (new millisecs_t( std::chrono::duration_cast<millisecs_t>(t2-t1) ))->count();
             //d2 = (new millisecs_t( std::chrono::duration_cast<millisecs_t>(t3-t2) ))->count();
@@ -227,12 +260,14 @@ void* LedsFinder::loopRecording(){
             //d4 = d1 + d2 + d3;
            // printf("#%i - Retrieve cam: %ims \nThreshold: %ims \nCompresse: %ims\nTotal: %ims\n size: %i Octets\n", i, d1, d2, d3, d4, sizeIz4);
             i++;
-            sendProto(dataToProto(rawImage.GetTimeStamp().seconds, rawImage.GetTimeStamp().microSeconds, izBuff, sizeLz4));
+            FlyCapture2::TimeStamp times = rawImage.GetTimeStamp();
+            sendProto(dataToProto(times.seconds, times.microSeconds, izBuff, sizeLz4));
             long elapsed1 = (t2.tv_sec-t1.tv_sec)*1000000 + t2.tv_usec-t1.tv_usec;
             long elapsed2 = (t3.tv_sec-t2.tv_sec)*1000000 + t3.tv_usec-t2.tv_usec;
             long elapsed3 = (t4.tv_sec-t3.tv_sec)*1000000 + t4.tv_usec-t3.tv_usec;
+            long elapsed4 = (t5.tv_sec-t4.tv_sec)*1000000 + t5.tv_usec-t4.tv_usec;
             
-            printf("Time pass: \n%i\n%i\n%i\n", elapsed1 ,elapsed2, elapsed3);
+            printf("Time pass: \n%i\n%i\n%i\n%i\n", elapsed1 ,elapsed2, elapsed3, elapsed4);
             //sendProto(dataToProto(rawImage.GetTimeStamp().seconds, rawImage.GetTimeStamp().microSeconds, *pngBuf, pngSize));
             
 
@@ -426,14 +461,14 @@ long LedsFinder::getTimeInMilliseconds()
 /*
    Convert a char array to PNG
 */
-void LedsFinder::compressToPNG(unsigned char**& pngBuf, size_t* pngSize, const unsigned char *imgBuf, const long int size){
-    int error = lodepng_encode_memory(pngBuf, pngSize, imgBuf, WIDTH, HEIGHT, LCT_GREY,  8);
+void LedsFinder::compressToPNG(unsigned char**& pngBuf, size_t* pngSize, const unsigned char *imgBuf, const int w, const int h){
+    int error = lodepng_encode_memory(pngBuf, pngSize, imgBuf, w, h, LCT_GREY,  8);
 
     if(error){
         printf("Error %u: %s\n", error, lodepng_error_text(error));
         exit(0);
     }
-    printf("Compression success!!\npng=%.3fko raw=%.3fko\n", (float)*pngSize/1000.f, (float)size/1000.f);
+    printf("Compression success!!\npng=%.3fko raw=%.3fko\n", (float)*pngSize/1000.f, (float)(w*h)/1000.f);
 }
 
 /*

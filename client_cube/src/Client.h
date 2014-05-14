@@ -41,8 +41,8 @@ private:
     static const int EXIT_CODE = 42;
     static const int NO_ERROR = 0;
 
-    static const int WIDTH = 640;
-    static const int HEIGHT = 480;
+    static const int WIDTH = 320; //640
+    static const int HEIGHT = 240; //480
 
     // TCP
     static const int BUFFER = 1024;

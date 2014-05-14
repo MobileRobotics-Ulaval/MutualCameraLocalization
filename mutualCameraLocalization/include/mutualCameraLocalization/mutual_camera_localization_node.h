@@ -60,7 +60,7 @@ typedef Eigen::Matrix<Eigen::Vector4d, Eigen::Dynamic, 1> List4DPoints; //!< A d
 class MCLNode
 {
 private:
-
+  const ros::Duration diffMax = ros::Duration(1);
   ros::NodeHandle nh_;
 
   image_transport::Publisher image_pubA_; //!< The ROS image publisher that publishes the visualisation image
@@ -77,7 +77,7 @@ private:
   //geometry_msgs::PoseWithCovarianceStamped predicted_pose_; //!< The ROS message variable for the estimated pose and covariance of the object
 
   bool have_camera_info_; //!< The boolean variable that indicates whether the camera calibration parameters have been obtained from the camera
-  bool camB_ready_;
+  ros::Time camB_time_;
   sensor_msgs::CameraInfo cam_info_; //!< Variable to store the camera calibration parameters
 
   //PoseEstimator trackable_object_; //!< Declaration of the object whose pose will be estimated

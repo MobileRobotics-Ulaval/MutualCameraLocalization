@@ -60,7 +60,7 @@ private:
     long getTimeInMilliseconds();
     dotCapture::Command*  getCommand();
 
-    void compressToPNG(unsigned char**& outBuf, size_t* outsize, const unsigned char *imgBuf, const long int size);
+    void compressToPNG(unsigned char**& outBuf, size_t* outsize, const unsigned char *imgBuf, const int w, const int h);
     void saveFilePNG(unsigned char* pngBuf, size_t pngSize, std::string filename);
     dotCapture::Img* dataToProto(long timestamp, int timestamp_microsec, unsigned char* data, long unsigned int size);
 
@@ -73,6 +73,7 @@ private:
     void* loopRecording();
     void configureProperties();
     inline void doThreshold(Image& img, int t);
+    inline void divByTwoRes(unsigned char* p, unsigned char* c, int w, int h);
 
    
     bool isRecording();
