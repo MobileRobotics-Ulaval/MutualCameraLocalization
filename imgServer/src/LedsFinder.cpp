@@ -13,7 +13,7 @@ LedsFinder::LedsFinder(int port, int t, float s, int b, int e, float g) : port(p
     ClientAddress.sin_port = htons(port);
 
     //pthread_cancel(imgGathering);
-    pthread_mutex_unlock(&proprietyMux);
+    //pthread_mutex_unlock(&proprietyMux);
 }
 /**
     Reduce the resolution of an image by a factor 2
@@ -172,41 +172,48 @@ void LedsFinder::startProcessingLoop(){
                     //printf("[SERVER] Change shutter\n");
                     pthread_mutex_lock(&proprietyMux);
                     shutter = o.value();
-                    if(recording)
+                    if(recording){
+                        pthread_mutex_lock(&proprietyMux);
                         configureProperties();
-                    pthread_mutex_unlock(&proprietyMux);
+                        pthread_mutex_unlock(&proprietyMux);
+                    }
                 }
                 else if(o.type() == dotCapture::Command::BRIGHTNESS){
                     //printf("[SERVER] Change brightness\n");
-                    pthread_mutex_lock(&proprietyMux);
                     brightness = o.value();
-                    if(recording)
+                    if(recording){
+                        pthread_mutex_lock(&proprietyMux);
                         configureProperties();
-                    pthread_mutex_unlock(&proprietyMux);
+                        pthread_mutex_unlock(&proprietyMux);
+                    }
                 }
                 else if(o.type() == dotCapture::Command::EXPOSURE){
                     //printf("[SERVER] Change exposure\n");
-                    pthread_mutex_lock(&proprietyMux);
                     exposure = o.value();
-                    if(recording)
+                    if(recording){
+                        pthread_mutex_lock(&proprietyMux);
                         configureProperties();
-                    pthread_mutex_unlock(&proprietyMux);
+                        pthread_mutex_unlock(&proprietyMux);
+                    }
                 }
                 else if(o.type() == dotCapture::Command::GAIN){
                     //printf("[SERVER] Change gain\n");
-                    pthread_mutex_lock(&proprietyMux);
                     gain = o.value();
-                    if(recording)
+                    if(recording){
+                        pthread_mutex_lock(&proprietyMux);
                         configureProperties();
-                    pthread_mutex_unlock(&proprietyMux);
+                        pthread_mutex_unlock(&proprietyMux);
+                    }
                 }
                 else if(o.type() == dotCapture::Command::THRESHOLD){
-                    //printf("[SERVER] Change threshold\n");
-                    pthread_mutex_lock(&proprietyMux);
+                    printf("[SERVER] Change threshold\n");
                     threshold = o.value();
-                    if(recording)
+                    if(recording){
+                        pthread_mutex_lock(&proprietyMux);
                         configureProperties();
-                    pthread_mutex_unlock(&proprietyMux);
+                        pthread_mutex_unlock(&proprietyMux);
+                    }
+                    printf("damn it\n");
                 }
 
             }
@@ -274,7 +281,7 @@ void* LedsFinder::loopRecording(){
             sendProto(dataToProto(times.seconds, times.microSeconds, izBuff, sizeLz4));
             gettimeofday(&t5, 0);
             //t/1frame = frame/s
-            fps = 1.f/(float)((t5.tv_sec-t6.tv_sec) + (t5.tv_usec-t6.tv_usec)/1000000.f);
+            fps = 1.f/(float)((t5.tv_sec-t6.tv_sec) + (float)(t5.tv_usec-t6.tv_usec)/1000000.f);
             printf("FPS: %f\n", fps);
             gettimeofday(&t6, 0);
             /*
