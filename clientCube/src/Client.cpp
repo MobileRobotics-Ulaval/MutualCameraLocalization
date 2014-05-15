@@ -246,6 +246,7 @@ void* Client::receivingImgLoop(){
 
     printf("\n");
 
+    //FIXME: FP - do you still need that? Would it reduce the CPU load to put it at 100 Hz instead of looping too fast when there is nothing?
     ros::Rate loop_rate(30);
     while(recording){
         //if(!nh.ok())
@@ -274,6 +275,7 @@ void* Client::receivingImgLoop(){
         cvSetData(pImg, iz4BuffDecod, pImg->widthStep);
 
         cv_image.image = pImg;
+        // FIXME: FP - we need to discuss about that with Philippe, it might be better to use to clock send by the embedded system.
         cv_image.header.stamp = ros::Time::now();
 
         cv_image.toImageMsg(ros_image);
@@ -311,7 +313,8 @@ void Client::compressToPNG(unsigned char**& pngBuf, size_t* pngSize, const unsig
 void Client::saveFilePNG(unsigned char* pngBuf, size_t pngSize, string filename){
     lodepng_save_file(pngBuf, pngSize, filename.c_str());
 }
-
+// TODO: FP - do a ROS service with an empty service call. For an example, see:
+// https://github.com/ethz-asl/ethzasl_icp_mapping/blob/master/ethzasl_icp_mapper/src/dynamic_mapper.cpp#L1013
 
 Client::~Client(){}
 
