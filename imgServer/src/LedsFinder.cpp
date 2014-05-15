@@ -18,24 +18,53 @@ LedsFinder::LedsFinder(int port, int t, float s, int b, int e, float g) : port(p
 /**
     Reduce the resolution of an image by a factor 2
 */
-inline void LedsFinder::divByTwoRes(unsigned char* p, unsigned char* c, int w, int h){
-    int nw = w/2;
-    int nh = h/2;
-    //unsigned char* c = (unsigned char*)malloc(w * h/4);
+inline void LedsFinder::divByTwoRes(unsigned char* p, unsigned char* c, int width, int height){
 
-    printf("%i\n", 2 * 200 * h + 2 * 100);
-    printf("%i\n", 2 * 200 * h + 2 * 100 + 1);
-    printf("%i\n", (2 * 200 + 1) * h + 2 * 100);
-    printf("%i\n", (2 * 200 + 1) * h + 2 * 100 + 1);
-    for(int i = 0; i < nw; i++){
-        for(int j = 0; j < nh; j++){// Way too slow
-            //printf("%i\n", (2 * i * w + 2 * j));
-            c[j * nw + i]  =(p[2 * j * w + 2 * i] +
-                             p[2 * j * w + 2 * i + 1] +
-                             p[(2 * j + 1) * w + 2 * i] +
-                             p[(2 * j + 1) * w + 2 * i + 1])/4;
+    #ifdef __arm__
+       
+    uint8_t * __restrict src1;
+    uint8_t * __restrict src2;
+    uint8_t * __restrict dest;
+
+    for (int h = 0; h < height/2 - 1; h++){
+        src1 = p+width*(h*2);
+        src2 = p+width*(h*2+1);
+        dest = c+width/2*h;
+        for (int i = 0; i < width; i += 16){
+            // load upper line and add neighbor pixels:
+            uint16x8_t a = vpaddlq_u8 (vld1q_u8 (src1));
+
+            // load lower line and add neighbor pixels:
+            uint16x8_t b = vpaddlq_u8 (vld1q_u8 (src2));
+
+            // sum of upper and lower line: 
+            uint16x8_t c = vaddq_u16 (a,b);
+
+            // divide by 4, convert to char and store:
+            vst1_u8 (dest, vshrn_n_u16 (c, 2));
+
+            // move pointers to next chunk of data
+            src1+=16;
+            src2+=16;
+            dest+=8;
         }
     }
+
+    #endif
+    #ifndef __arm__
+        int nw = width/2;
+        int nh = height/2;
+        //unsigned char* c = (unsigned char*)malloc(w * h/4);
+        for(int i = 0; i < nw; i++){
+            for(int j = 0; j < nh; j++){// Way too slow
+                //printf("%i\n", (2 * i * w + 2 * j));
+                c[j * nw + i]  =(p[2 * j * width + 2 * i] +
+                                 p[2 * j * width + 2 * i + 1] +
+                                 p[(2 * j + 1) * width + 2 * i] +
+                                 p[(2 * j + 1) * width + 2 * i + 1])/4;
+            }
+        }
+    #endif
    // p = c;
 }
 
@@ -125,13 +154,13 @@ void LedsFinder::startProcessingLoop(){
 
                 if(o.type() == dotCapture::Command::START_RECORDING){
                     //printf("[SERVER] Start Recording\n");
-                    setRecording(true);
+                    recording = true;
 
                     pthread_create(&imgGathering, 0, LedsFinder::callLoopRecordingFunction, this);
                 }
                 else if(o.type() == dotCapture::Command::STOP_RECORDING){
                     //printf("[SERVER] Stop Recording\n");
-                    setRecording(false);
+                    recording = false;
                     pthread_join(imgGathering, NULL);
 
                 }
@@ -143,7 +172,7 @@ void LedsFinder::startProcessingLoop(){
                     //printf("[SERVER] Change shutter\n");
                     pthread_mutex_lock(&proprietyMux);
                     shutter = o.value();
-                    if(isRecording())
+                    if(recording)
                         configureProperties();
                     pthread_mutex_unlock(&proprietyMux);
                 }
@@ -151,7 +180,7 @@ void LedsFinder::startProcessingLoop(){
                     //printf("[SERVER] Change brightness\n");
                     pthread_mutex_lock(&proprietyMux);
                     brightness = o.value();
-                    if(isRecording())
+                    if(recording)
                         configureProperties();
                     pthread_mutex_unlock(&proprietyMux);
                 }
@@ -159,7 +188,7 @@ void LedsFinder::startProcessingLoop(){
                     //printf("[SERVER] Change exposure\n");
                     pthread_mutex_lock(&proprietyMux);
                     exposure = o.value();
-                    if(isRecording())
+                    if(recording)
                         configureProperties();
                     pthread_mutex_unlock(&proprietyMux);
                 }
@@ -167,7 +196,7 @@ void LedsFinder::startProcessingLoop(){
                     //printf("[SERVER] Change gain\n");
                     pthread_mutex_lock(&proprietyMux);
                     gain = o.value();
-                    if(isRecording())
+                    if(recording)
                         configureProperties();
                     pthread_mutex_unlock(&proprietyMux);
                 }
@@ -175,7 +204,7 @@ void LedsFinder::startProcessingLoop(){
                     //printf("[SERVER] Change threshold\n");
                     pthread_mutex_lock(&proprietyMux);
                     threshold = o.value();
-                    if(isRecording())
+                    if(recording)
                         configureProperties();
                     pthread_mutex_unlock(&proprietyMux);
                 }
@@ -189,28 +218,7 @@ void LedsFinder::startProcessingLoop(){
     } 
 }
 
-/*
-   Setter/getter of the recording flag
-*/
-bool LedsFinder::isRecording(){
-    bool r;
-    printf("[isrecord");
-    pthread_mutex_lock(&recordingMux);
-    r = recording;
-    printf("u");
-    pthread_mutex_unlock(&recordingMux);
-    printf("]\n");
-    return r;
-}
 
-void LedsFinder::setRecording(bool r){
-    printf("[setrecord");
-    pthread_mutex_lock(&recordingMux);
-    recording = r;
-    printf("u");
-    pthread_mutex_unlock(&recordingMux);
-    printf("]\n");
-}
 
 /*
    Starting function of the image recording Thread.
@@ -221,8 +229,9 @@ void* LedsFinder::loopRecording(){
     int sizeLz4;
     int i = 0;
     int d1, d2, d3, d4;
-    struct timeval t1, t2, t3, t4, t5;
+    struct timeval t1, t2, t3, t4, t5, t6;
     long elapsed1, elapsed2, elapsed3, elapsed4;
+    float fps;
     //times_t t1, t2, t3, t4;
 
     unsigned char* izBuff = (unsigned char*)malloc(WIDTH * HEIGHT/4);
@@ -230,8 +239,10 @@ void* LedsFinder::loopRecording(){
     //unsigned char* decod = (unsigned char*)malloc(WIDTH * HEIGHT);
     
     // If the camera is not connected, the thread is stop
+
+    gettimeofday(&t6, 0);
     if(this->startRecording() == 0){
-        while(isRecording()){
+        while(recording){
             //t1 = std::chrono::steady_clock::now();
             gettimeofday(&t1, 0);
 
@@ -251,7 +262,6 @@ void* LedsFinder::loopRecording(){
             //compressToPNG(pngBuf, &pngSize, rawImage.GetData(), rawImage.GetDataSize());
             sizeLz4 = LZ4_compress((char*)(void*)(res), (char*)(void*)(izBuff), WIDTH * HEIGHT/4);
            // t4 = std::chrono::steady_clock::now();
-            gettimeofday(&t5, 0);
             
            //d1 = (new millisecs_t( std::chrono::duration_cast<millisecs_t>(t2-t1) ))->count();
             //d2 = (new millisecs_t( std::chrono::duration_cast<millisecs_t>(t3-t2) ))->count();
@@ -262,12 +272,20 @@ void* LedsFinder::loopRecording(){
             i++;
             FlyCapture2::TimeStamp times = rawImage.GetTimeStamp();
             sendProto(dataToProto(times.seconds, times.microSeconds, izBuff, sizeLz4));
-            long elapsed1 = (t2.tv_sec-t1.tv_sec)*1000000 + t2.tv_usec-t1.tv_usec;
-            long elapsed2 = (t3.tv_sec-t2.tv_sec)*1000000 + t3.tv_usec-t2.tv_usec;
-            long elapsed3 = (t4.tv_sec-t3.tv_sec)*1000000 + t4.tv_usec-t3.tv_usec;
-            long elapsed4 = (t5.tv_sec-t4.tv_sec)*1000000 + t5.tv_usec-t4.tv_usec;
+            gettimeofday(&t5, 0);
+            //t/1frame = frame/s
+            fps = 1.f/(float)((t5.tv_sec-t6.tv_sec) + (t5.tv_usec-t6.tv_usec)/1000000.f);
+            printf("FPS: %f\n", fps);
+           // gettimeofday(&t6, 0);
+            /*
+            elapsed1 = (t2.tv_sec-t1.tv_sec)*1000000 + t2.tv_usec-t1.tv_usec;
+            elapsed2 = (t3.tv_sec-t2.tv_sec)*1000000 + t3.tv_usec-t2.tv_usec;
+            elapsed3 = (t4.tv_sec-t3.tv_sec)*1000000 + t4.tv_usec-t3.tv_usec;
+            elapsed4 = (t5.tv_sec-t4.tv_sec)*1000000 + t5.tv_usec-t4.tv_usec;
             
-            printf("Time pass: \n%i\n%i\n%i\n%i\n", elapsed1 ,elapsed2, elapsed3, elapsed4);
+            printf("Time pass: \n%li\n%li\n%li\n%li\n", elapsed1 ,elapsed2, elapsed3, elapsed4);
+            */
+
             //sendProto(dataToProto(rawImage.GetTimeStamp().seconds, rawImage.GetTimeStamp().microSeconds, *pngBuf, pngSize));
             
 
@@ -356,7 +374,7 @@ dotCapture::Command*  LedsFinder::getCommand(){
     
     //close(comSocket);
    // close(socketFileDescriptor);
-    return com; 
+    return com;
 }
 
 

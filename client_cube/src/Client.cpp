@@ -53,7 +53,7 @@ int Client::startListeningLoop(){
             continue;
         }
         if(i == 1){ 
-            if(isRecording()){
+            if(recording){
                 printf("Stop recording before exiting\n");
                 continue;
             }
@@ -61,14 +61,14 @@ int Client::startListeningLoop(){
             dotCapture::Command d;
             d.add_option()->set_type(dotCapture::Command::START_RECORDING);
             sendCommand(d);
-            setRecording(true);
+            recording = true;
 
             printf("Start imgLoop thread\n");
             pthread_create(&imgGathering, 0, Client::callReceivingImgLoopFunction, this);
 
         }
         else if(i == 2){ 
-            if(!isRecording()){
+            if(!recording){
                 printf("Not currently recording!!\n");
                 continue;
             } 
@@ -77,7 +77,7 @@ int Client::startListeningLoop(){
             dotCapture::Command d;
             d.add_option()->set_type(dotCapture::Command::STOP_RECORDING);
             sendCommand(d);
-            setRecording(false);
+            recording = false;
 
             printf("Join imgGathering thread...\n");
             pthread_join(imgGathering, NULL);
@@ -113,13 +113,13 @@ int Client::startListeningLoop(){
         else if(i == 5){ 
             dotCapture::Command d;
             // In case we are still recording.
-            if(isRecording()){
+            if(recording){
                 d.add_option()->set_type(dotCapture::Command::STOP_RECORDING);
                 sendCommand(d);
                 dotCapture::Command d2;
                 d2.add_option()->set_type(dotCapture::Command::DISCONNECT);
                 sendCommand(d2);
-                setRecording(false);
+                recording = false;
 
                 printf("Join imgGathering thread...\n");
                 pthread_join(imgGathering, NULL);
@@ -237,7 +237,7 @@ void* Client::receivingImgLoop(){
     printf("\n");
 
     ros::Rate loop_rate(30);
-    while(isRecording()){
+    while(recording){
         //if(!nh.ok())
            // printf("Fuck\n");
         //printf("Receiving image...\n");
@@ -255,7 +255,7 @@ void* Client::receivingImgLoop(){
         codedIn.PopLimit(msgLimit);
 
 
-        printf("Timestamp: %i\n Micro: %i\n", message.timestamp(), message.timestamp_microsec());
+        //printf("Timestamp: %i\n Micro: %i\n", message.timestamp(), message.timestamp_microsec());
         data = (unsigned char*)(const void *)message.mutable_image()->c_str();
 
         sizeLz4 = LZ4_decompress_safe((char*)(void*)(data), (char*)(void*)(iz4BuffDecod), message.mutable_image()->size(), WIDTH * HEIGHT);
@@ -279,28 +279,7 @@ void* Client::receivingImgLoop(){
     printf("Images total =%i\n", i);
 }
 
-/*
-   Setter/getter of the recording flag
-*/
-bool Client::isRecording(){
-    bool r;
-    printf("[isrecord");
-    pthread_mutex_lock(&recordingMux);
-    r = recording;
-    printf("u");
-    pthread_mutex_unlock(&recordingMux);
-    printf("]\n");
-    return r;
-}
 
-void Client::setRecording(bool r){
-    printf("[setrecord");
-    pthread_mutex_lock(&recordingMux);
-    recording = r;
-    printf("u");
-    pthread_mutex_unlock(&recordingMux);
-    printf("]\n");
-}
 
 
 /*

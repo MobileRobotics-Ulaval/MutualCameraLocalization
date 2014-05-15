@@ -22,6 +22,9 @@
 #include <sstream>
 #include <cstdlib> // exit()
 #include <pthread.h>
+#ifdef __arm__
+    #include <arm_neon.h>
+#endif
 //#include <mutex>
 //#include <thread>
 //#include <chrono>
@@ -53,7 +56,7 @@ private:
     pthread_t imgGathering;
     pthread_mutex_t recordingMux; 
     pthread_mutex_t proprietyMux; 
-    bool recording;
+    volatile bool recording;
     
     void printErrorCam(Error error);
     void checkForErrorTCP(int errorCode, const char* errorMessage);
@@ -74,11 +77,6 @@ private:
     void configureProperties();
     inline void doThreshold(Image& img, int t);
     inline void divByTwoRes(unsigned char* p, unsigned char* c, int w, int h);
-
-   
-    bool isRecording();
-    void setRecording(bool r);
-
 
 public:
     void takeRawPicture(int nbrPic, int threshold);

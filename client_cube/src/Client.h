@@ -55,7 +55,7 @@ private:
 
     // Threading
     pthread_mutex_t recordingMux; 
-    bool recording;
+    volatile bool recording;
 
     //ROS
     ros::NodeHandle nh;
