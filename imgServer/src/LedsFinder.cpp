@@ -13,7 +13,7 @@ LedsFinder::LedsFinder(int port, int t, float s, int b, int e, float g) : port(p
     ClientAddress.sin_port = htons(port);
 
     //pthread_cancel(imgGathering);
-    //pthread_mutex_unlock(&recordingMux);
+    pthread_mutex_unlock(&proprietyMux);
 }
 /**
     Reduce the resolution of an image by a factor 2
@@ -276,7 +276,7 @@ void* LedsFinder::loopRecording(){
             //t/1frame = frame/s
             fps = 1.f/(float)((t5.tv_sec-t6.tv_sec) + (t5.tv_usec-t6.tv_usec)/1000000.f);
             printf("FPS: %f\n", fps);
-           // gettimeofday(&t6, 0);
+            gettimeofday(&t6, 0);
             /*
             elapsed1 = (t2.tv_sec-t1.tv_sec)*1000000 + t2.tv_usec-t1.tv_usec;
             elapsed2 = (t3.tv_sec-t2.tv_sec)*1000000 + t3.tv_usec-t2.tv_usec;
