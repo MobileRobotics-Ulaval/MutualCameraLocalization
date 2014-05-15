@@ -46,38 +46,10 @@ MCLNode::MCLNode()
   image_transport::ImageTransport image_transport(nh_);
   image_pubA_ = image_transport.advertise("image_with_detectionsA", 1);
   image_pubB_ = image_transport.advertise("image_with_detectionsB", 1);
-
-  // Create the marker positions from the test points
-   /*List4DPoints positions_of_markers_on_object;
-
-  // Read in the marker positions from the YAML parameter file
- XmlRpc::XmlRpcValue points_list;
-  if (!nh_.getParam(ros::this_node::getName() + "/marker_positions", points_list))
-  {
-    ROS_ERROR(
-        "%s: No reference file containing the marker positions, or the file is improperly formatted. Use the 'marker_positions_file' parameter in the launch file.",
-        ros::this_node::getName().c_str());
-    ros::shutdown();
-  }
-  else
-  {
-    positions_of_markers_on_object.resize(points_list.size());
-    for (int i = 0; i < points_list.size(); i++)
-    {
-      Eigen::Matrix<double, 4, 1> temp_point;
-      temp_point(0) = points_list[i]["x"];
-      temp_point(1) = points_list[i]["y"];
-      temp_point(2) = points_list[i]["z"];
-      temp_point(3) = 1;
-      positions_of_markers_on_object(i) = temp_point;
-    }
-  }
-  //trackable_object_.setMarkerPositions(positions_of_markers_on_object);
-  ROS_INFO("The number of markers on the object are: %d", (int )positions_of_markers_on_object.size());*/
 }
 
 /**
- * Destructor of the Monocular Pose Estimation Node class
+ * Destructor of the Mutual camera localization Node class
  *
  */
 MCLNode::~MCLNode()
@@ -262,11 +234,14 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
         //int fx = camera_matrix_K_[0][0];
         //int fy = camera_matrix_K_[1][1];
         Eigen::Vector2d fCam(camera_matrix_K_.at<double>(0, 0), camera_matrix_K_.at<double>(1, 1)); 
-        Eigen::Vector2d pp(camera_matrix_K_.at<double>(0, 2), camera_matrix_K_.at<double>(1, 2)); 
+        Eigen::Vector2d pp(camera_matrix_K_.at<double>(0, 2)/2 -  (int)image.cols/2, camera_matrix_K_.at<double>(1, 2)/2 -  (int)image.rows/2); 
+        //Eigen::Vector2d pp(camera_matrix_K_.at<double>(0, 2) -  image.cols/2, camera_matrix_K_.at<double>(1, 2) - image.rows/2); 
+        //Eigen::Vector2d pp(0, 0); 
+        //cout<<"PP: "<<pp<<endl;
         double rdA, ldA, rdB, ldB;
-        rdA = 0.1;
+        rdA = 0.125;
         ldA = rdA;
-        rdB = 0.1;
+        rdB = 0.125;
         ldB = rdB;
         Eigen::Vector3d pos(0,0,0);
         double dist;
@@ -320,8 +295,7 @@ void MCLNode::initMarker(){
 /**
  * The dynamic reconfigure callback function. This function updates the variable within the program whenever they are changed using dynamic reconfigure.
  */
-/*void MCLNode::dynamicParametersCallback(mutual_camera_localizator::MonocularPoseEstimatorConfig &config, uint32_t level)
-{
+/*void MCLNode::dynamicParametersCallback(mutual_camera_localizator::MonocularPoseEstimatorConfig &config, uint32_t level){
   
   trackable_object_.detection_threshold_value_ = config.threshold_value;
   trackable_object_.gaussian_sigma_ = config.gaussian_sigma;

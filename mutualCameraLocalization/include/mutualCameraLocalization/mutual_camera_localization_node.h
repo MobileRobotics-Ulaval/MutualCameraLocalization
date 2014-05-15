@@ -60,7 +60,7 @@ typedef Eigen::Matrix<Eigen::Vector4d, Eigen::Dynamic, 1> List4DPoints; //!< A d
 class MCLNode
 {
 private:
-  const ros::Duration diffMax = ros::Duration(1);
+  const ros::Duration diffMax = ros::Duration(0.5);
   ros::NodeHandle nh_;
 
   image_transport::Publisher image_pubA_; //!< The ROS image publisher that publishes the visualisation image

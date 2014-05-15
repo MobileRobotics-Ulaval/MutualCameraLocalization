@@ -54,7 +54,6 @@ private:
 
     // Threading
     pthread_t imgGathering;
-    pthread_mutex_t recordingMux; 
     pthread_mutex_t proprietyMux; 
     volatile bool recording;
     
