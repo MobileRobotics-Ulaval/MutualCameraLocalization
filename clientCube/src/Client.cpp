@@ -26,7 +26,7 @@ Client::Client(): recording(false){
     //    printf("Not ok");
     //}
 
-    comSocket = socket(AF_INET, SOCK_STREAM, 0);
+	comSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (comSocket < 0) 
         printf("ERROR opening socket\n");
         
@@ -245,10 +245,13 @@ void* Client::receivingImgLoop(){
     pImg = cvCreateImageHeader(cvSize(WIDTH, HEIGHT), IPL_DEPTH_8U, 1);
     sensor_msgs::Image ros_image;
 
+    camera_info_manager::CameraInfoManager m(nh, "narrow_stereo", "package://client_cube/calibration.ini");
 
+    sensor_msgs::CameraInfo ros_camInfo = m.getCameraInfo();
 
     printf("\n");
 
+    ros::Rate loop_rate(30);
     while(recording){
         //if(!nh.ok())
            // printf("Fuck\n");
