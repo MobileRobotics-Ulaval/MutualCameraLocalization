@@ -23,6 +23,7 @@
 
 #include <geometry_msgs/PoseStamped.h>
 #include <visualization_msgs/Marker.h>
+#include <tf/transform_broadcaster.h>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
@@ -41,9 +42,10 @@
 
 namespace mutual_camera_localizator
 {
+  /*
 typedef Eigen::Matrix<double, 6, 6> Matrix6d; //!< A 6x6 matrix of doubles
 typedef Eigen::Matrix<double, 2, 6> Matrix2x6d; //!< A 2x6 matrix of doubles
-typedef Eigen::Matrix<double, 3, 4> Matrix3x4d; //!< A 3x4 matrix of doubles
+typedef Eigen::Matrix<double, 3, 4> Eigen::Matrix<double, 3, 4>; //!< A 3x4 matrix of doubles
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXYd; //!< A matrix of doubles containing dynamic rows and columns
 typedef Eigen::Matrix<unsigned, Eigen::Dynamic, Eigen::Dynamic> MatrixXYu; //!< A matrix of unsigned integers containing dynamic rows and columns
 typedef Eigen::Matrix<double, 6, 1> Vector6d; //!< A column vector of 6 elements containing doubles
@@ -56,11 +58,11 @@ typedef Eigen::Matrix<unsigned, 1, Eigen::Dynamic> RowXu; //!< A dynamic row vec
 typedef Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> List2DPoints; //!< A dynamic column vector containing Vector2D elements. \see Vector2d
 typedef Eigen::Matrix<Eigen::Vector3d, Eigen::Dynamic, 1> List3DPoints; //!< A dynamic column vector containing Vector3D elements. \see Vector3d
 typedef Eigen::Matrix<Eigen::Vector4d, Eigen::Dynamic, 1> List4DPoints; //!< A dynamic column vector containing Vector4D elements. \see Vector4d
-
-class MCLNode
-{
+*/
+class MCLNode{
 private:
-  const ros::Duration diffMax = ros::Duration(0.5);
+  const ros::Duration diffMax = ros::Duration(1);
+  tf::TransformBroadcaster br;
   ros::NodeHandle nh_;
 
   image_transport::Publisher image_pubA_; //!< The ROS image publisher that publishes the visualisation image
@@ -89,10 +91,10 @@ private:
   cv::Mat camera_matrix_P_; //!< Variable to store the projection matrix (as an OpenCV matrix) that projects points onto the rectified image plane.
   std::vector<double> camera_distortion_coeffs_; //!< Variable to store the camera distortion parameters
   std::vector<cv::Point2f> distorted_detection_centers_;
-  Matrix3x4d camera_projection_matrix_; //!< Stores the camera calibration matrix. This is the 3x4 projection matrix that projects the world points to the image coordinates stored in #image_points_.
-  List2DPoints image_vectorsA_;
-  List2DPoints image_vectorsB_;
-  //List2DPoints image_vectors_2;
+  Eigen::Matrix<double, 3, 4> camera_projection_matrix_; //!< Stores the camera calibration matrix. This is the 3x4 projection matrix that projects the world points to the image coordinates stored in #image_points_.
+  Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_vectorsA_;
+  Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_vectorsB_;
+  //Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_vectors_2;
 public:
 
   MCLNode();
@@ -118,7 +120,7 @@ public:
 
   //void dynamicParametersCallback(mutual_camera_localizator::MonocularPoseEstimatorConfig &config, uint32_t level);
 
-  //void calculateImageVectors(List2DPoints image_points);
+  //void calculateImageVectors(Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_points);
 };
 
 } // mutual_camera_localizator_node namespace

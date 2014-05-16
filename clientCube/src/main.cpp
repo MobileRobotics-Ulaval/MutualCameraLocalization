@@ -8,5 +8,6 @@ int main(int argc, char* argv[]){
 	ros::init(argc, argv,  "image_publisher");
 	Client client;
 	client.startListeningLoop();
+	//client.foo();
 	return 0;
 }

@@ -41,8 +41,8 @@ private:
     static const int EXIT_CODE = 42;
     static const int NO_ERROR = 0;
 
-    static const int WIDTH = 320; //640
-    static const int HEIGHT = 240; //480
+    int WIDTH; //640
+    int HEIGHT; //480
 
     // TCP
     static const int BUFFER = 1024;
@@ -71,6 +71,7 @@ public:
     void saveFilePNG(unsigned char* pngBuf, size_t pngSize, std::string filename);
     bool isRecording();
     void setRecording(bool r);
+    void foo();
 	~Client();
 };
 

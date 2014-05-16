@@ -39,6 +39,7 @@ MCLNode::MCLNode()
   // Initialize pose publisher
   //pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("estimated_pose", 1);
   pose_pub_ = nh_.advertise<visualization_msgs::Marker>("estimated_pose", 1);
+  //pose_pub_ = nh_.advertise<nav_msgs::Odometry>("estimated_pose", 1);
   initMarker();
 
 
@@ -69,7 +70,7 @@ void MCLNode::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
     cam_info_ = *msg;
 
     // Calibrated camera
-    Matrix3x4d camera_matrix;
+    Eigen::Matrix<double, 3, 4> camera_matrix;
     camera_matrix(0, 0) = cam_info_.P[0];
     camera_matrix(0, 2) = cam_info_.P[2];
     camera_matrix(1, 1) = cam_info_.P[5];
@@ -110,13 +111,13 @@ void MCLNode::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg){
 
 }
 
-//void MCLNode::calculateImageVectors(List2DPoints image_points){}
+//void MCLNode::calculateImageVectors(Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_points){}
 
 bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
   region_of_interest_ = cv::Rect(0, 0, image.cols, image.rows);
 
     // Do detection of LEDs in image
-  List2DPoints detected_led_positions;
+  Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> detected_led_positions;
   //distorted_detection_centers_;
 
   LEDDetector::findLeds(image, region_of_interest_, 140, 0.6, 100,
@@ -134,7 +135,7 @@ bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
 
     //printf("P1: (%f, %f)\n",(float)detected_led_positions(0)(0),(float)detected_led_positions(0)(1));
     //printf("P2: (%f, %f)\n",(float)detected_led_positions(1)(0),(float)detected_led_positions(1)(1));
-    List2DPoints* image_vectors;
+    Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1>* image_vectors;
     if(camA)
       image_vectors = &image_vectorsA_;
     else
@@ -147,7 +148,7 @@ bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
       single_vector(0) = (detected_led_positions(i)(0) - camera_projection_matrix_(0, 2)) / camera_projection_matrix_(0, 0);
       single_vector(1) = (detected_led_positions(i)(1) - camera_projection_matrix_(1, 2)) / camera_projection_matrix_(1, 1);
     
-      (*image_vectors)(i) = single_vector / single_vector.norm();
+      (*image_vectors)(i) = detected_led_positions(i);//single_vector;// / single_vector.norm();
     }
   }
   else
@@ -205,6 +206,7 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
 
     cv::Mat visualized_image = image.clone();
     cv::cvtColor(visualized_image, visualized_image, CV_GRAY2RGB);
+
     Visualization::createVisualizationImage(visualized_image, image_vectorsA_, camera_matrix_K_, camera_distortion_coeffs_,
                                           region_of_interest_, distorted_detection_centers_);
 
@@ -221,7 +223,7 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
 
 
     if(camA && !camB_ready)
-        ROS_WARN("CamB delay too long: %li", (image_msg->header.stamp - camB_time_).toSec());
+        ROS_WARN("CamB delay too long: %f", (image_msg->header.stamp - camB_time_).toSec());
 
 
     if(camA && camB_ready){
@@ -234,19 +236,20 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
         //int fx = camera_matrix_K_[0][0];
         //int fy = camera_matrix_K_[1][1];
         Eigen::Vector2d fCam(camera_matrix_K_.at<double>(0, 0), camera_matrix_K_.at<double>(1, 1)); 
-        Eigen::Vector2d pp(camera_matrix_K_.at<double>(0, 2)/2 -  (int)image.cols/2, camera_matrix_K_.at<double>(1, 2)/2 -  (int)image.rows/2); 
+        Eigen::Vector2d pp(camera_matrix_K_.at<double>(0, 2), camera_matrix_K_.at<double>(1, 2)); 
         //Eigen::Vector2d pp(camera_matrix_K_.at<double>(0, 2) -  image.cols/2, camera_matrix_K_.at<double>(1, 2) - image.rows/2); 
         //Eigen::Vector2d pp(0, 0); 
         //cout<<"PP: "<<pp<<endl;
         double rdA, ldA, rdB, ldB;
-        rdA = 0.125;
-        ldA = rdA;
+        ldA = 0.13;
+        rdA = 0.14;
+        ldB = 0.11;
         rdB = 0.125;
-        ldB = rdB;
+
         Eigen::Vector3d pos(0,0,0);
         double dist;
 
-        Eigen::MatrixXd rotation = Compute3DMutualLocalisation(ImageA1, ImageA2, ImageB1, ImageB2, pp, pp, fCam, fCam,
+        Eigen::Matrix< double, 3, 3 > rotation = Compute3DMutualLocalisation(ImageA1, ImageA2, ImageB1, ImageB2, pp, pp, fCam, fCam,
                                                                rdA, ldA, rdB, ldB, &pos, &dist);
         //cout<<"fCam: "<<fCam<<endl;
         //cout<<"pp: "<<pp<<endl;
@@ -259,14 +262,34 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
         marker_pose_.pose.position.x = pos[0];
         marker_pose_.pose.position.y = pos[1];
         marker_pose_.pose.position.z = pos[2];
-        //Eigen::Quaterniond orientation = Eigen::Quaterniond(rotation.block<3, 3>(0, 0));
-        
-        //predicted_pose_.pose.pose.orientation.x = orientation.x();
-       // predicted_pose_.pose.pose.orientation.y = orientation.y();
-        //predicted_pose_.pose.pose.orientation.z = orientation.z();
-       // predicted_pose_.pose.pose.orientation.w = orientation.w();
+        Eigen::Quaterniond orientation = Eigen::Quaterniond(rotation);
+        //tf frame(cube) poseStamped odometry
+        //cuba parent -  cubeB child_id
+        marker_pose_.pose.orientation.x = orientation.x();
+        marker_pose_.pose.orientation.y = orientation.y();
+        marker_pose_.pose.orientation.z = orientation.z();
+        marker_pose_.pose.orientation.w = orientation.w();
 
         pose_pub_.publish(marker_pose_);
+
+        /*broadcaster.sendTransform(
+        tf::StampedTransform(
+        marker_pose_,
+        ros::Time::now(),"cubeA", "cubeB"));*/
+        tf::Transform transform;
+        transform.setOrigin( tf::Vector3(marker_pose_.pose.position.x,
+                                         marker_pose_.pose.position.y,
+                                         marker_pose_.pose.position.z));
+        tf::Quaternion q(marker_pose_.pose.orientation.x,
+                         marker_pose_.pose.orientation.y,
+                         marker_pose_.pose.orientation.z,
+                         marker_pose_.pose.orientation.w);
+        transform.setRotation(q);
+        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/cubeB", "/cubeA"));
+        /*
+        transform.setOrigin( tf::Vector3(0, 0, 0);
+        transform.setRotation(tf::Quaternion(0, 0, 0) );
+        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "cubeA"));*/
     }
   }
   else
@@ -276,15 +299,15 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
 }
 
 void MCLNode::initMarker(){
-    marker_pose_.header.frame_id = "/cube";
+    marker_pose_.header.frame_id = "/cubeA";
     marker_pose_.id = 0;
     marker_pose_.type = visualization_msgs::Marker::CUBE;
     marker_pose_.lifetime = ros::Duration();
 
     marker_pose_.action = visualization_msgs::Marker::ADD;
-    marker_pose_.scale.x = 10;
-    marker_pose_.scale.y = 10;
-    marker_pose_.scale.z = 10;
+    marker_pose_.scale.x = 0.1;
+    marker_pose_.scale.y = 0.1;
+    marker_pose_.scale.z = 0.1;
 
     marker_pose_.color.r = 0.0f;
     marker_pose_.color.g = 1.0f;

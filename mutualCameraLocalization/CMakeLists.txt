@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   dynamic_reconfigure
   geometry_msgs
+  tf
 )
 
 # since we need eigen search it as well

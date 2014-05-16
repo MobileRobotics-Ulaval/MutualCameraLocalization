@@ -58,9 +58,9 @@ void Visualization::createVisualizationImage(cv::Mat &image, List2DPoints image_
   std::vector<cv::Point3f> points_to_project;
   points_to_project.resize(4);
 
-  points_to_project[0].x = image_vectors_(0)(0);
-  points_to_project[0].y = image_vectors_(0)(1);
-  points_to_project[0].z = 1;
+  //points_to_project[0].x = image_vectors_(0)(0);
+  //points_to_project[0].y = image_vectors_(0)(1);
+  //points_to_project[0].z = 1;
 
   //projectOrientationVectorsOnImage(image, points_to_project, camera_matrix_K, camera_distortion_coeffs);
 
