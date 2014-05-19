@@ -55,8 +55,8 @@ void Visualization::createVisualizationImage(cv::Mat &image, List2DPoints image_
 
   //Eigen::Matrix4d visualisation_pts = transform * orientation_vector_points;
 
-  std::vector<cv::Point3f> points_to_project;
-  points_to_project.resize(4);
+ // std::vector<cv::Point3f> points_to_project;
+  //points_to_project.resize(4);
 
   //points_to_project[0].x = image_vectors_(0)(0);
   //points_to_project[0].y = image_vectors_(0)(1);

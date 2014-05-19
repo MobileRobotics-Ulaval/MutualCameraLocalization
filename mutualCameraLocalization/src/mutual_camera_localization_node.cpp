@@ -120,7 +120,7 @@ bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
   Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> detected_led_positions;
   //distorted_detection_centers_;
 
-  LEDDetector::findLeds(image, region_of_interest_, 140, 0.6, 100,
+  LEDDetector::findLeds(image, region_of_interest_, 140, 0.6, 20,
                         40000, 0.5, 0.5,
                         detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
                         camera_distortion_coeffs_, camera_matrix_P_);
@@ -207,7 +207,11 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
     cv::Mat visualized_image = image.clone();
     cv::cvtColor(visualized_image, visualized_image, CV_GRAY2RGB);
 
-    Visualization::createVisualizationImage(visualized_image, image_vectorsA_, camera_matrix_K_, camera_distortion_coeffs_,
+    if(camA)
+      Visualization::createVisualizationImage(visualized_image, image_vectorsA_, camera_matrix_K_, camera_distortion_coeffs_,
+                                          region_of_interest_, distorted_detection_centers_);
+    else
+      Visualization::createVisualizationImage(visualized_image, image_vectorsB_, camera_matrix_K_, camera_distortion_coeffs_,
                                           region_of_interest_, distorted_detection_centers_);
 
     // Publish image for visualization

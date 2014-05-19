@@ -10,7 +10,7 @@ int main(){
 	    
 	printf("[SERVER] Start image server...\n");
 	LedsFinder ledsFinder(5005, threshold, shutter, brightness, exposure, gain);
-	//ledsFinder.takeRawPicture(100,threshold);
+	//ledsFinder.takeRawPicture(1,threshold);
 	ledsFinder.startProcessingLoop();
 	return 0;
 }

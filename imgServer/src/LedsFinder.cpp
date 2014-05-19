@@ -98,7 +98,6 @@ void LedsFinder::takeRawPicture(int nbrPic, int threshold){
 
 	for (int i=0; i < nbrPic; i++){
 		Error err = cam.RetrieveBuffer( &rawImage );
-        printf("fuck");
 		doThreshold(rawImage, threshold);
         divByTwoRes(rawImage.GetData(), res, WIDTH, HEIGHT);
 
@@ -277,12 +276,12 @@ void* LedsFinder::loopRecording(){
             //d4 = d1 + d2 + d3;
            // printf("#%i - Retrieve cam: %ims \nThreshold: %ims \nCompresse: %ims\nTotal: %ims\n size: %i Octets\n", i, d1, d2, d3, d4, sizeIz4);
             i++;
-            FlyCapture2::TimeStamp times = rawImage.GetTimeStamp();
-            sendProto(dataToProto(times.seconds, times.microSeconds, izBuff, sizeLz4));
+            //FlyCapture2::TimeStamp times = rawImage.GetTimeStamp();
             gettimeofday(&t5, 0);
+            sendProto(dataToProto(t5.tv_sec, t6.tv_sec, izBuff, sizeLz4));
             //t/1frame = frame/s
-            fps = 1.f/(float)((t5.tv_sec-t6.tv_sec) + (float)(t5.tv_usec-t6.tv_usec)/1000000.f);
-            printf("FPS: %f\n", fps);
+            //fps = 1.f/(float)((t5.tv_sec-t6.tv_sec) + (float)(t5.tv_usec-t6.tv_usec)/1000000.f);
+            //printf("FPS: %f\n", fps);
             gettimeofday(&t6, 0);
             /*
             elapsed1 = (t2.tv_sec-t1.tv_sec)*1000000 + t2.tv_usec-t1.tv_usec;
