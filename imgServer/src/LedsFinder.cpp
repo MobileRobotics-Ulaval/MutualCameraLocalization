@@ -118,13 +118,17 @@ void LedsFinder::takeRawPicture(int nbrPic, int threshold){
     Main Server loop
 */
 void LedsFinder::startProcessingLoop(){
+    int socketFileDescriptor;
+    int opt = 1;
+    struct sockaddr_in clientAddress;
+    socklen_t clientAdressLength;
     while(true){
         //Creation of the socket
-        int socketFileDescriptor;
-        struct sockaddr_in clientAddress;
-        socklen_t clientAdressLength;
         
         socketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+        
+        setsockopt(socketFileDescriptor, SOL_SOCKET, SO_REUSEADDR,(const char *)&opt,sizeof(int));
+
         this->checkForErrorTCP(socketFileDescriptor, "ERROR opening socket");
         
         int comErrorCode = bind(socketFileDescriptor, (struct sockaddr *) &ClientAddress, sizeof(ClientAddress));

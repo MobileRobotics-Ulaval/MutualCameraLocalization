@@ -27,9 +27,9 @@ MCLNode::MCLNode()
 {
   // Set up a dynamic reconfigure server.
   // This should be done before reading parameter server values.
-  //dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig>::CallbackType cb_;
-  //cb_ = boost::bind(&MCLNode::dynamicParametersCallback, this, _1, _2);
-  //dr_server_.setCallback(cb_);
+  dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig>::CallbackType cb_;
+  cb_ = boost::bind(&MCLNode::dynamicParametersCallback, this, _1, _2);
+  dr_server_.setCallback(cb_);
 
   // Initialize subscribers
   image_subA_ = nh_.subscribe("/cameraA/image_raw", 1, &MCLNode::imageCallbackA, this);
@@ -120,8 +120,14 @@ bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
   Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> detected_led_positions;
   //distorted_detection_centers_;
 
-  LEDDetector::findLeds(image, region_of_interest_, 140, 0.6, 20,
-                        40000, 0.5, 0.5,
+/*(const cv::Mat &image, cv::Rect ROI, const int &threshold_value, const double &gaussian_sigma,
+                           const double &min_blob_area, const double &max_blob_area,
+                           const double &max_width_height_distortion, const double &max_circular_distortion,
+                           List2DPoints &pixel_positions, std::vector<cv::Point2f> &distorted_detection_centers,
+                           const cv::Mat &camera_matrix_K, const std::vector<double> &camera_distortion_coeffs,
+                           const cv::Mat &camera_matrix_P)*/
+  LEDDetector::findLeds(image, region_of_interest_, 0, 0.6, 20,
+                        500, 0.5, 0.5,
                         detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
                         camera_distortion_coeffs_, camera_matrix_P_);
   detected_led_positions.size();
@@ -204,27 +210,6 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
     if(!camA)
         camB_time_ = image_msg->header.stamp;
 
-    cv::Mat visualized_image = image.clone();
-    cv::cvtColor(visualized_image, visualized_image, CV_GRAY2RGB);
-
-    if(camA)
-      Visualization::createVisualizationImage(visualized_image, image_vectorsA_, camera_matrix_K_, camera_distortion_coeffs_,
-                                          region_of_interest_, distorted_detection_centers_);
-    else
-      Visualization::createVisualizationImage(visualized_image, image_vectorsB_, camera_matrix_K_, camera_distortion_coeffs_,
-                                          region_of_interest_, distorted_detection_centers_);
-
-    // Publish image for visualization
-    cv_bridge::CvImage visualized_image_msg;
-    visualized_image_msg.header = image_msg->header;
-    visualized_image_msg.encoding = sensor_msgs::image_encodings::BGR8;
-    visualized_image_msg.image = visualized_image;
-
-    if(camA)
-      image_pubA_.publish(visualized_image_msg.toImageMsg());
-    else
-      image_pubB_.publish(visualized_image_msg.toImageMsg());
-
 
     if(camA && !camB_ready)
         ROS_WARN("CamB delay too long: %f", (image_msg->header.stamp - camB_time_).toSec());
@@ -300,6 +285,27 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
   { // If pose was not updated
     ROS_WARN("Unable to resolve a pose.");
   }
+
+  cv::Mat visualized_image = image.clone();
+  cv::cvtColor(visualized_image, visualized_image, CV_GRAY2RGB);
+
+  if(camA)
+    Visualization::createVisualizationImage(visualized_image, image_vectorsA_, camera_matrix_K_, camera_distortion_coeffs_,
+                                        region_of_interest_, distorted_detection_centers_);
+  else
+    Visualization::createVisualizationImage(visualized_image, image_vectorsB_, camera_matrix_K_, camera_distortion_coeffs_,
+                                        region_of_interest_, distorted_detection_centers_);
+
+  // Publish image for visualization
+  cv_bridge::CvImage visualized_image_msg;
+  visualized_image_msg.header = image_msg->header;
+  visualized_image_msg.encoding = sensor_msgs::image_encodings::BGR8;
+  visualized_image_msg.image = visualized_image;
+
+  if(camA)
+    image_pubA_.publish(visualized_image_msg.toImageMsg());
+  else
+    image_pubB_.publish(visualized_image_msg.toImageMsg());
 }
 
 void MCLNode::initMarker(){
@@ -322,7 +328,7 @@ void MCLNode::initMarker(){
 /**
  * The dynamic reconfigure callback function. This function updates the variable within the program whenever they are changed using dynamic reconfigure.
  */
-/*void MCLNode::dynamicParametersCallback(mutual_camera_localizator::MonocularPoseEstimatorConfig &config, uint32_t level){
+void MCLNode::dynamicParametersCallback(mutual_camera_localizator::MonocularPoseEstimatorConfig &config, uint32_t level){
   
   trackable_object_.detection_threshold_value_ = config.threshold_value;
   trackable_object_.gaussian_sigma_ = config.gaussian_sigma;
@@ -339,7 +345,7 @@ void MCLNode::initMarker(){
 
   ROS_INFO("Parameters changed");
   
-}*/
+}
 
 
 

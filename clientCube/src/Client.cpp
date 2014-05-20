@@ -248,6 +248,7 @@ void* Client::receivingImgLoop(){
     printf("\n");
 
     ros::Rate loop_rate(30);
+    printf("Start recording!!!\n");
     while(recording){
         //printf("Receiving image...\n");
         int received = recvDelimProtobuf(comSocket, &buffer);
@@ -268,14 +269,18 @@ void* Client::receivingImgLoop(){
         data = (unsigned char*)(const void *)message.mutable_image()->c_str();
 
         sizeLz4 = LZ4_decompress_safe((char*)(void*)(data), (char*)(void*)(iz4BuffDecod), message.mutable_image()->size(), WIDTH * HEIGHT);
+        
         printf("#%i img  %do\n", i, (int)message.mutable_image()->size());
+        
         
         cvSetData(pImg, iz4BuffDecod, pImg->widthStep);
 
         cv_image.image = pImg;
         
         // ---------- TO CHANGE FOR THE ACTUAL TIME ON THE DEVICE!!! ---------
-        cv_image.header.stamp = ros::Time::now();
+        ros::Time time_on_device(message.timestamp(), message.timestamp_microsec());
+        //cv_image.header.stamp = ros::Time::now();
+        cv_image.header.stamp = time_on_device;
 
         cv_image.toImageMsg(ros_image);
         pub.publish(ros_image, ros_camInfo);
@@ -290,6 +295,10 @@ void* Client::receivingImgLoop(){
     printf("Images total =%i\n", i);
 }
 
+
+/**
+    Debugging fonction, send a image from a PNG file
+*/
 void Client::foo(){
     unsigned char *buffer;
     unsigned char* data;

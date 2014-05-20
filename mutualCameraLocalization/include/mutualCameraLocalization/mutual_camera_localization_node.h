@@ -73,8 +73,8 @@ private:
   ros::Subscriber image_subB_; //!< The ROS subscriber to the raw camera image B
   ros::Subscriber camera_info_sub_; //!< The ROS subscriber to the camera info
 
-  //dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig> dr_server_; //!< The dynamic reconfigure server
-  //dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig>::CallbackType cb_; //!< The dynamic reconfigure callback type
+  dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig> dr_server_; //!< The dynamic reconfigure server
+  dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig>::CallbackType cb_; //!< The dynamic reconfigure callback type
 
   //geometry_msgs::PoseWithCovarianceStamped predicted_pose_; //!< The ROS message variable for the estimated pose and covariance of the object
 
@@ -118,7 +118,7 @@ public:
                                             double rdA, double ldA, double rdB, double ldB,
                                             Eigen::Vector3d* pos, double* dist);
 
-  //void dynamicParametersCallback(mutual_camera_localizator::MonocularPoseEstimatorConfig &config, uint32_t level);
+  void dynamicParametersCallback(mutual_camera_localizator::MonocularPoseEstimatorConfig &config, uint32_t level);
 
   //void calculateImageVectors(Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_points);
 };
