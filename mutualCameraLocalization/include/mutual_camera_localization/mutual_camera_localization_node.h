@@ -103,7 +103,8 @@ private:
   double max_circular_distortion_;
   double rdA_, ldA_, rdB_, ldB_;
   double line_angle_tolerance_;
-  double ratio_tolerance_;
+  double pos_ratio_tolerance_;
+  double radius_ratio_tolerance_;
   double min_avg_led_int_;
   double ratio_ellipse_max_;
   double ratio_ellipse_min_;

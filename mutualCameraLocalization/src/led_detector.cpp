@@ -12,7 +12,7 @@
  */
 
 #include "ros/ros.h"
-#include "mutualCameraLocalization/led_detector.h"
+#include "mutual_camera_localization/led_detector.h"
 
 namespace mutual_camera_localizator
 {

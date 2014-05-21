@@ -14,7 +14,7 @@
  *
  */
 using namespace std;
-#include "mutualCameraLocalization/mutual_camera_localization_node.h"
+#include "mutual_camera_localization/mutual_camera_localization_node.h"
 
 namespace mutual_camera_localizator
 {
@@ -332,7 +332,8 @@ void MCLNode::dynamicParametersCallback(mutual_camera_localization::MutualCamera
   ldB_ = config.pos_left_led_cam_b; rdB_ = config.pos_right_led_cam_b;
 
   line_angle_tolerance_ = config.line_angle_tolerance;
-  ratio_tolerance_ = config.ratio_tolerance;
+  pos_ratio_tolerance_ = config.pos_ratio_tolerance;
+  radius_ratio_tolerance_ = config.radius_ratio_tolerance;
   min_avg_led_int_ = config.min_avg_led_int;
   ratio_ellipse_max_ = config.ratio_ellipse_max;
   ratio_ellipse_max_ = config.ratio_ellipse_max;

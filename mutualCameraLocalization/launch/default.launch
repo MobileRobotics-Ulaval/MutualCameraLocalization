@@ -15,8 +15,9 @@
         <param name= "max_circular_distortion" value = "0.5" />
 
         <param name= "line_angle_tolerance" value = "0.9" />
-        <param name= "ratio_tolerance" value = "0.6" />
-        <param name= "min_avg_led_int" value = "150" 
+        <param name= "pos_ratio_tolerance" value = "0.6" />
+        <param name= "radius_ratio_tolerance" value = "0.3" />
+        <param name= "min_avg_led_int" value = "150" />
         <param name= "ratio_ellipse_max" value = "1.5" />
         <param name= "ratio_ellipse_min" value = "0.65" />
 

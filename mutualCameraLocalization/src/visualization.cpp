@@ -11,7 +11,7 @@
  *
  */
 
-#include "mutualCameraLocalization/visualization.h"
+#include "mutual_camera_localization/visualization.h"
 #include <stdio.h>
 #include "ros/ros.h"
 
