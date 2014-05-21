@@ -19,7 +19,7 @@ find_package(Eigen REQUIRED)
 find_package(OpenCV REQUIRED)
 
 # Generate the reconfigure options
-generate_dynamic_reconfigure_options(cfg/MonocularPoseEstimator.cfg)
+generate_dynamic_reconfigure_options(cfg/MutualCameraLocalization.cfg)
 
 # export the dependencies of this package for who ever depends on us
 catkin_package(

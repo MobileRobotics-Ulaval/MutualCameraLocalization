@@ -34,9 +34,9 @@
 #include <opencv/highgui.h>
 
 #include <dynamic_reconfigure/server.h>
-//#include <mutual_camera_localizator/MonocularPoseEstimatorConfig.h>
-#include <mutualCameraLocalization/led_detector.h>
-#include <mutualCameraLocalization/visualization.h>
+#include <mutual_camera_localization/MutualCameraLocalizationConfig.h>
+#include <mutual_camera_localization/led_detector.h>
+#include <mutual_camera_localization/visualization.h>
 
 //#include "mutual_camera_localizator/pose_estimator.h"
 
@@ -73,8 +73,8 @@ private:
   ros::Subscriber image_subB_; //!< The ROS subscriber to the raw camera image B
   ros::Subscriber camera_info_sub_; //!< The ROS subscriber to the camera info
 
-  dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig> dr_server_; //!< The dynamic reconfigure server
-  dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig>::CallbackType cb_; //!< The dynamic reconfigure callback type
+  dynamic_reconfigure::Server<mutual_camera_localization::MutualCameraLocalizationConfig> dr_server_; //!< The dynamic reconfigure server
+  dynamic_reconfigure::Server<mutual_camera_localization::MutualCameraLocalizationConfig>::CallbackType cb_; //!< The dynamic reconfigure callback type
 
   //geometry_msgs::PoseWithCovarianceStamped predicted_pose_; //!< The ROS message variable for the estimated pose and covariance of the object
 
@@ -95,6 +95,18 @@ private:
   Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_vectorsA_;
   Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_vectorsB_;
   //Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_vectors_2;
+
+  double gaussian_sigma_;
+  double min_blob_area_;
+  double max_blob_area_;
+  double max_width_height_distortion_;
+  double max_circular_distortion_;
+  double rdA_, ldA_, rdB_, ldB_;
+  double line_angle_tolerance_;
+  double ratio_tolerance_;
+  double min_avg_led_int_;
+  double ratio_ellipse_max_;
+  double ratio_ellipse_min_;
 public:
 
   MCLNode();
@@ -118,7 +130,7 @@ public:
                                             double rdA, double ldA, double rdB, double ldB,
                                             Eigen::Vector3d* pos, double* dist);
 
-  void dynamicParametersCallback(mutual_camera_localizator::MonocularPoseEstimatorConfig &config, uint32_t level);
+  void dynamicParametersCallback(mutual_camera_localization::MutualCameraLocalizationConfig &config, uint32_t level);
 
   //void calculateImageVectors(Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_points);
 };

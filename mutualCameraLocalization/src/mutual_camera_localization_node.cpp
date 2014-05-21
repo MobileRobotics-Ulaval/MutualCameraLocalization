@@ -27,7 +27,7 @@ MCLNode::MCLNode()
 {
   // Set up a dynamic reconfigure server.
   // This should be done before reading parameter server values.
-  dynamic_reconfigure::Server<mutual_camera_localizator::MonocularPoseEstimatorConfig>::CallbackType cb_;
+  dynamic_reconfigure::Server<mutual_camera_localization::MutualCameraLocalizationConfig>::CallbackType cb_;
   cb_ = boost::bind(&MCLNode::dynamicParametersCallback, this, _1, _2);
   dr_server_.setCallback(cb_);
 
@@ -119,15 +119,9 @@ bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
     // Do detection of LEDs in image
   Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> detected_led_positions;
   //distorted_detection_centers_;
-
-/*(const cv::Mat &image, cv::Rect ROI, const int &threshold_value, const double &gaussian_sigma,
-                           const double &min_blob_area, const double &max_blob_area,
-                           const double &max_width_height_distortion, const double &max_circular_distortion,
-                           List2DPoints &pixel_positions, std::vector<cv::Point2f> &distorted_detection_centers,
-                           const cv::Mat &camera_matrix_K, const std::vector<double> &camera_distortion_coeffs,
-                           const cv::Mat &camera_matrix_P)*/
-  LEDDetector::findLeds(image, region_of_interest_, 0, 0.6, 20,
-                        500, 0.5, 0.5,
+//TODO : line_angle_tolerance ratio_tolerance min_avg_led_int
+  LEDDetector::findLeds(image, region_of_interest_, 0, gaussian_sigma_, min_blob_area_,
+                        max_blob_area_, max_width_height_distortion_, max_circular_distortion_,
                         detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
                         camera_distortion_coeffs_, camera_matrix_P_);
   detected_led_positions.size();
@@ -229,17 +223,17 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
         //Eigen::Vector2d pp(camera_matrix_K_.at<double>(0, 2) -  image.cols/2, camera_matrix_K_.at<double>(1, 2) - image.rows/2); 
         //Eigen::Vector2d pp(0, 0); 
         //cout<<"PP: "<<pp<<endl;
-        double rdA, ldA, rdB, ldB;
-        ldA = 0.13;
+        //double rdA, ldA, rdB, ldB;
+       /* ldA = 0.13;
         rdA = 0.14;
         ldB = 0.11;
-        rdB = 0.125;
+        rdB = 0.125;*/
 
         Eigen::Vector3d pos(0,0,0);
         double dist;
 
         Eigen::Matrix< double, 3, 3 > rotation = Compute3DMutualLocalisation(ImageA1, ImageA2, ImageB1, ImageB2, pp, pp, fCam, fCam,
-                                                               rdA, ldA, rdB, ldB, &pos, &dist);
+                                                               rdA_, ldA_, rdB_, ldB_, &pos, &dist);
         //cout<<"fCam: "<<fCam<<endl;
         //cout<<"pp: "<<pp<<endl;
         //cout<<"Position: "<<pos<<endl;
@@ -328,20 +322,20 @@ void MCLNode::initMarker(){
 /**
  * The dynamic reconfigure callback function. This function updates the variable within the program whenever they are changed using dynamic reconfigure.
  */
-void MCLNode::dynamicParametersCallback(mutual_camera_localizator::MonocularPoseEstimatorConfig &config, uint32_t level){
-  
-  trackable_object_.detection_threshold_value_ = config.threshold_value;
-  trackable_object_.gaussian_sigma_ = config.gaussian_sigma;
-  trackable_object_.min_blob_area_ = config.min_blob_area;
-  trackable_object_.max_blob_area_ = config.max_blob_area;
-  trackable_object_.max_width_height_distortion_ = config.max_width_height_distortion;
-  trackable_object_.max_circular_distortion_ = config.max_circular_distortion;
-  trackable_object_.roi_border_thickness_ = config.roi_border_thickness;
+void MCLNode::dynamicParametersCallback(mutual_camera_localization::MutualCameraLocalizationConfig &config, uint32_t level){
+  gaussian_sigma_ = config.gaussian_sigma;
+  min_blob_area_ = config.min_blob_area;
+  max_blob_area_ = config.max_blob_area;
+  max_width_height_distortion_ = config.max_width_height_distortion;
+  max_circular_distortion_ = config.max_circular_distortion;
+  ldA_ = config.pos_left_led_cam_a; rdA_ = config.pos_right_led_cam_a;
+  ldB_ = config.pos_left_led_cam_b; rdB_ = config.pos_right_led_cam_b;
 
-  trackable_object_.setBackProjectionPixelTolerance(config.back_projection_pixel_tolerance);
-  trackable_object_.setNearestNeighbourPixelTolerance(config.nearest_neighbour_pixel_tolerance);
-  trackable_object_.setCertaintyThreshold(config.certainty_threshold);
-  trackable_object_.setValidCorrespondenceThreshold(config.valid_correspondence_threshold);
+  line_angle_tolerance_ = config.line_angle_tolerance;
+  ratio_tolerance_ = config.ratio_tolerance;
+  min_avg_led_int_ = config.min_avg_led_int;
+  ratio_ellipse_max_ = config.ratio_ellipse_max;
+  ratio_ellipse_max_ = config.ratio_ellipse_max;
 
   ROS_INFO("Parameters changed");
   
