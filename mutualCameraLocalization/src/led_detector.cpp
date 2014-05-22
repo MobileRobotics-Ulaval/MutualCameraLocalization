@@ -19,6 +19,195 @@ namespace mutual_camera_localizator
 
 typedef Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> List2DPoints; //!< A dynamic column vector containing Vector2D elements. \see Vector2d
 
+void LEDDetector::LedFilteringTrypon(const cv::Mat &gaussian_image, const double &min_blob_area, const double &max_blob_area, const double &max_circular_distortion,
+               const double &radius_ratio_tolerance, 
+               const double &min_ratio_ellipse, const double &max_ratio_ellipse,
+               const double &distance_ratio, const double &distance_ratio_tolerance,
+               const double &acos_tolerance, int OutputFlag, const double &acos_tolerance
+                           std::vector<cv::Point2f> &distorted_detection_centers) {
+
+  distorted_detection_centers.clear();
+  std::vector<cv::Point2f> detection_centers;
+  bool FoundLEDs = false; // Flag to indicate if we have found the LEDs or not
+  cv::Rect ROI= cv::Rect(0,0,gaussian_image.cols,gaussian_image.rows);
+
+    // Find all contours
+    std::vector<std::vector<cv::Point> > contours;
+    cv::findContours(gaussian_image.clone(), contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+
+    // Vector for containing the detected points that will be undistorted later
+    // std::vector<cv::Point2f> distorted_points;
+    int DataIndex = 1; // For matlab-compatible output, when chasing the parameters.
+  
+    std::vector<cv::Point2f> KeptContoursPosition;
+    std::vector<double> KeptRadius, KeptAvgIntensity;
+
+    // Identify the blobs in the image
+    for (unsigned i = 0; i < contours.size(); i++)
+    {
+    double area = cv::contourArea(contours[i]); // Blob area
+    cv::Rect rect = cv::boundingRect(contours[i]); // Bounding box
+    double radius = (rect.width + rect.height) / 4; // Average radius
+
+    cv::Moments mu;
+    mu = cv::moments(contours[i], false);
+    cv::Point2f mc;
+    mc = cv::Point2f(mu.m10 / mu.m00, mu.m01 / mu.m00) + cv::Point2f(ROI.x, ROI.y);
+
+    if (area > 0.01) {
+      double width_height_distortion = std::abs(1 - std::min((double)rect.width / (double)rect.height, (double)rect.height / (double)rect.width));
+      double circular_distortion1 = std::abs(1 - (area / (CV_PI * pow(rect.width / 2, 2.0))));
+      double circular_distortion2 = std::abs(1 - (area / (CV_PI * pow(rect.height / 2, 2.0))));
+
+      cv::RotatedRect minEllipse;
+      double RatioEllipse = 1.0;
+      if (contours[i].size()>4) {
+        minEllipse = cv::fitEllipse(cv::Mat(contours[i]));
+        RatioEllipse = float(minEllipse.boundingRect().width+1.0)/float(minEllipse.boundingRect().height+1.0);  // the 0.5 is to increase immunity to small circles.
+      }
+      int x, y;
+      double total_intensity=0.0,avg_intensity;
+      for (x = rect.x; x<rect.x+rect.width; x++) {
+        for (y = rect.y; y<rect.y+rect.height; y++) {
+          cv::Scalar intensity = gaussian_image.at<uchar>(y, x);
+          total_intensity+= float(intensity.val[0]);
+        }
+      }
+      avg_intensity = total_intensity/area;
+
+      if (OutputFlag==1) {
+        // We want to output some data for further analysis in matlab.
+        printf("%6.2f, %6.2f, %6.2f, %6.2f, %6.2f, %6.2f, %6.2f, %8.2f, %6.2f, %.2f, %d\n", mc.x, mc.y, area, radius, width_height_distortion,circular_distortion1,circular_distortion2,total_intensity,avg_intensity,RatioEllipse,DataIndex);
+        DataIndex++;
+      }
+  
+      // We will prune the blobs set based on appearance. These were found using matlab.
+      if ((area < max_blob_area) && (circular_distortion1 < max_circular_distortion) && (circular_distortion2 < max_circular_distortion)
+            && (RatioEllipse < max_ratio_ellipse) && (RatioEllipse > min_ratio_ellipse )) {
+        // These will be used further down the filtering pipeline
+        // Ideally we would sort in order of intensity, and do a n choose k on a sliding window of that ranked intensity.
+        KeptContoursPosition.push_back(mc);
+        KeptRadius.push_back(radius);
+        KeptAvgIntensity.push_back(avg_intensity);
+      }
+    }
+    }
+
+  // Filtering step #2: doing all the permutations to find the one with the best characteristics.
+  // We are basically looking at:
+  //   -Three blobs in line (line angle tolerance)
+  //   -With a 3-to-1 ratio between the shortest distance to the longest distance
+  //   -And similar radii
+  int nBlob = KeptContoursPosition.size();
+  cv::Point vec1, vec2, vec3, shortArm, longArm;
+  double norm1, norm2, norm3, cosArms;
+  int index;
+  double RatioRadii, RatioDistance, minDist, maxDist, maxIntensity=0.0;
+  int l1, l2, l3, BestCombo[3];
+  for (l1 = 0; l1<(nBlob-2);l1++) {
+      for (l2 = (l1+1); l2<(nBlob-1); l2++) {
+      for (l3 = (l2+1); l3<nBlob; l3++) {
+        // This is n-choose-k permutations
+
+        // Test 1: Radius ratio tolerance
+        // Let's start with the computations that take the least amount of time
+        RatioRadii = std::min(std::min(KeptRadius[l1],KeptRadius[l2]),KeptRadius[l3])/std::max(std::max(KeptRadius[l1],KeptRadius[l2]),KeptRadius[l3]);
+        if (std::abs(RatioRadii-1.0)>radius_ratio_tolerance) continue;
+
+        // Ok now we have no choice. We have to compute the 3 vectors representing the 3-choose-2 combination of leds
+        vec1 = KeptContoursPosition[l1]-KeptContoursPosition[l2];
+        vec2 = KeptContoursPosition[l2]-KeptContoursPosition[l3];
+        vec3 = KeptContoursPosition[l3]-KeptContoursPosition[l1];
+        norm1 = cv::norm(vec1);
+        norm2 = cv::norm(vec2);
+        norm3 = cv::norm(vec3);
+
+        // Test 2: Led Distance tolerance
+        minDist = std::min(std::min(norm1,norm2),norm3);
+        maxDist = std::max(std::max(norm1,norm2),norm3);
+        RatioDistance = maxDist/minDist;
+        if (std::abs(RatioDistance-distance_ratio)>distance_ratio_tolerance) continue;
+
+        // Now we have to find the actual shortest arm
+        if (minDist == norm1) shortArm = vec1;
+        else if (minDist == norm2) shortArm = vec2;
+        else shortArm = vec3;
+
+        // Now we have to find the actual longest arm
+        if (maxDist == norm1) longArm = vec1;
+        else if (maxDist == norm2) longArm = vec2;
+        else longArm = vec3;
+
+        // Test 3: tolerance on the angle between the arms
+        cosArms = std::abs(shortArm.dot(longArm)/(minDist*maxDist));
+        //double cosArms2 = std::abs(shortArm.dot(longArm)/(cv::norm(shortArm)*cv::norm(longArm)));
+        //printf("combo %d %d %d has passed first 3 tests, with cos=%.2f, %.2f!\n",l1, l2, l3,cosArms, cosArms2);
+        double val = std::abs(std::abs(cosArms)-1.0);
+        if (val>acos_tolerance) continue;
+        
+
+        // Test 4: we keep the one with the highest average intensity
+        double sumIntensity = KeptAvgIntensity[l1]+KeptAvgIntensity[l2]+KeptAvgIntensity[l3];
+        if (sumIntensity > maxIntensity) {
+          maxIntensity = sumIntensity;
+          FoundLEDs = true;
+          BestCombo[0] = l1;
+          BestCombo[1] = l2;
+          BestCombo[2] = l3;
+        }
+      }
+    }
+    }
+
+  if (FoundLEDs) {
+    // We then push the best results
+    for (index = 0; index < 3; index++) {
+      detection_centers.push_back(KeptContoursPosition[BestCombo[index]]);
+    }
+
+    // Order the dot from left to right
+    if(detection_centers[0].x <= detection_centers[1].x && detection_centers[0].x <= detection_centers[2].x){
+      distorted_detection_centers.push_back(detection_centers[0]);
+      if(detection_centers[1].x <= detection_centers[2].x){
+        distorted_detection_centers.push_back(detection_centers[1]);
+        distorted_detection_centers.push_back(detection_centers[2]);
+      }
+      else{
+        distorted_detection_centers.push_back(detection_centers[2]);
+        distorted_detection_centers.push_back(detection_centers[1]);
+      }
+    }
+    else if(detection_centers[1].x <= detection_centers[0].x && detection_centers[1].x <= detection_centers[2].x){
+      distorted_detection_centers.push_back(detection_centers[1]);
+      if(detection_centers[0].x <= detection_centers[2].x){
+        distorted_detection_centers.push_back(detection_centers[0]);
+        distorted_detection_centers.push_back(detection_centers[2]);
+      }
+      else{
+        distorted_detection_centers.push_back(detection_centers[2]);
+        distorted_detection_centers.push_back(detection_centers[0]);
+      }
+    }
+    else{
+      distorted_detection_centers.push_back(detection_centers[2]);
+      if(detection_centers[0].x <= detection_centers[1].x){
+        distorted_detection_centers.push_back(detection_centers[0]);
+        distorted_detection_centers.push_back(detection_centers[1]);
+      }
+      else{
+        distorted_detection_centers.push_back(detection_centers[1]);
+        distorted_detection_centers.push_back(detection_centers[0]);
+      }
+    }
+
+  } 
+
+  else {
+    // We flush whatever was in there, to indicate that we didn't find anything.
+    distorted_detection_centers.clear();
+  }
+}
+
 // LED detector
 void LEDDetector::findLeds(const cv::Mat &image, cv::Rect ROI, const int &threshold_value, const double &gaussian_sigma,
                            const double &min_blob_area, const double &max_blob_area,

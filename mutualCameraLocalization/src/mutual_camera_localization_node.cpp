@@ -23,7 +23,7 @@ namespace mutual_camera_localizator
  * Constructor of the Monocular Pose Estimation Node class
  *
  */
-MCLNode::MCLNode()
+MCLNode::MCLNode(): diffMax(ros::Duration(1))
 {
   // Set up a dynamic reconfigure server.
   // This should be done before reading parameter server values.
@@ -119,11 +119,18 @@ bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
     // Do detection of LEDs in image
   Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> detected_led_positions;
   //distorted_detection_centers_;
-//TODO : line_angle_tolerance ratio_tolerance min_avg_led_int
+  /*
   LEDDetector::findLeds(image, region_of_interest_, 0, gaussian_sigma_, min_blob_area_,
                         max_blob_area_, max_width_height_distortion_, max_circular_distortion_,
                         detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
                         camera_distortion_coeffs_, camera_matrix_P_);
+                        */
+  LEDDetector::LedFilteringTrypon(image, min_blob_area_, max_blob_area_, max_circular_distortion_,
+               radius_ratio_tolerance_, 
+               ratio_ellipse_min_, ratio_ellipse_max_,
+               pos_ratio_, pos_ratio_tolerance_,
+               line_angle_tolerance_, 1,
+                           distorted_detection_centers_);
   detected_led_positions.size();
   /*if(camA)
     printf("camA- Nbr of leds: %i\n",(int)detected_led_positions.size());
@@ -333,10 +340,11 @@ void MCLNode::dynamicParametersCallback(mutual_camera_localization::MutualCamera
 
   line_angle_tolerance_ = config.line_angle_tolerance;
   pos_ratio_tolerance_ = config.pos_ratio_tolerance;
+  pos_ratio_ = config.pos_ratio;
   radius_ratio_tolerance_ = config.radius_ratio_tolerance;
   min_avg_led_int_ = config.min_avg_led_int;
   ratio_ellipse_max_ = config.ratio_ellipse_max;
-  ratio_ellipse_max_ = config.ratio_ellipse_max;
+  ratio_ellipse_min_ = config.ratio_ellipse_min;
 
   ROS_INFO("Parameters changed");
   

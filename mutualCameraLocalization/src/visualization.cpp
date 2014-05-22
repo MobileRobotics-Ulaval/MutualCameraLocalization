@@ -65,38 +65,11 @@ void Visualization::createVisualizationImage(cv::Mat &image, List2DPoints image_
   //projectOrientationVectorsOnImage(image, points_to_project, camera_matrix_K, camera_distortion_coeffs);
 
   // Draw a circle around the detected LED
-  for (int i = 0; i < distorted_detection_centers.size(); i++)
-  {
-    cv::circle(image, distorted_detection_centers[i], 10, CV_RGB(255, 0, 0), 2);
-    /*
-    string text = "Funny text inside the box";
-    int fontFace = FONT_HERSHEY_SCRIPT_SIMPLEX;
-    double fontScale = 2;
-    int thickness = 3;
-
-    Mat img(600, 800, CV_8UC3, Scalar::all(0));
-
-    int baseline=0;
-    Size textSize = getTextSize(text, fontFace,
-                                fontScale, thickness, &baseline);
-    baseline += thickness;
-
-    // center the text
-    Point textOrg((img.cols - textSize.width)/2,
-                  (img.rows + textSize.height)/2);
-
-    // draw the box
-    rectangle(img, textOrg + Point(0, baseline),
-              textOrg + Point(textSize.width, -textSize.height),
-              Scalar(0,0,255));
-    // ... and the baseline first
-    line(img, textOrg + Point(0, thickness),
-         textOrg + Point(textSize.width, thickness),
-         Scalar(0, 0, 255));
-
-    // then put the text itself
-    putText(img, text, textOrg, fontFace, fontScale,
-            Scalar::all(255), thickness, 8);*/
+  for (int i = 1; i < distorted_detection_centers.size(); i++){
+    cv::line(image, distorted_detection_centers[i - 1], distorted_detection_centers[i], CV_RGB(0, 255, 0), 2);
+  }
+  for (int i = 0; i < distorted_detection_centers.size(); i++){
+    cv::circle(image, distorted_detection_centers[i], 2, CV_RGB(255, 0, 0), 2);
   }
 
   // Draw region of interest

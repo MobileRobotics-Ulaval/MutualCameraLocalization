@@ -76,7 +76,12 @@ public:
                        List2DPoints &pixel_positions, std::vector<cv::Point2f> &distorted_detection_centers,
                        const cv::Mat &camera_matrix_K, const std::vector<double> &camera_distortion_coeffs,
                        const cv::Mat &camera_matrix_P);
-
+  static void LedFilteringTrypon(const cv::Mat &gaussian_image, const double &min_blob_area, const double &max_blob_area, const double &max_circular_distortion,
+               const double &radius_ratio_tolerance, 
+               const double &min_ratio_ellipse, const double &max_ratio_ellipse,
+               const double &distance_ratio, const double &distance_ratio_tolerance,
+               const double &acos_tolerance, int OutputFlag,
+                           std::vector<cv::Point2f> &distorted_detection_centers);
   /**
    * Calculates the region of interest (ROI) in the distorted image in which the points lie.
    *

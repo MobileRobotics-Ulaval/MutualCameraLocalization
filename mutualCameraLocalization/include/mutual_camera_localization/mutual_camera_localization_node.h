@@ -61,7 +61,7 @@ typedef Eigen::Matrix<Eigen::Vector4d, Eigen::Dynamic, 1> List4DPoints; //!< A d
 */
 class MCLNode{
 private:
-  const ros::Duration diffMax = ros::Duration(1);
+  const ros::Duration diffMax;
   tf::TransformBroadcaster br;
   ros::NodeHandle nh_;
 
@@ -104,6 +104,7 @@ private:
   double rdA_, ldA_, rdB_, ldB_;
   double line_angle_tolerance_;
   double pos_ratio_tolerance_;
+  double pos_ratio_;
   double radius_ratio_tolerance_;
   double min_avg_led_int_;
   double ratio_ellipse_max_;

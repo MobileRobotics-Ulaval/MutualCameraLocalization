@@ -8,13 +8,14 @@
 
     <node name="mutual_camera_localization" pkg="mutual_camera_localization" type="mutual_camera_localization" respawn="false" output="screen"> 
         <!--<rosparam command="load" file="$(arg marker_positions_file)"/>-->
-        <param name= "gaussian_sigma" value = "0.6" />
-        <param name= "min_blob_area" value = "20" />
-        <param name= "max_blob_area" value = "500" />
-        <param name= "max_width_height_distortion" value = "0.5" />
-        <param name= "max_circular_distortion" value = "0.5" />
+        <param name= "gaussian_sigma" value = "0.1" />
+        <param name= "min_blob_area" value = "100" />
+        <param name= "max_blob_area" value = "2000" />
+        <param name= "max_width_height_distortion" value = "0.6" />
+        <param name= "max_circular_distortion" value = "0.8" />
 
-        <param name= "line_angle_tolerance" value = "0.9" />
+        <param name= "line_angle_tolerance" value = "0.05" />
+        <param name= "pos_ratio" value = "3" />
         <param name= "pos_ratio_tolerance" value = "0.6" />
         <param name= "radius_ratio_tolerance" value = "0.3" />
         <param name= "min_avg_led_int" value = "150" />
