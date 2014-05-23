@@ -5,9 +5,9 @@ using namespace std;
 /**
     Initiation of the server
 */
-LedsFinder::LedsFinder(int port, int t, float s, int b, int e, float g) : port(port), threshold(t), shutter(s), brightness(b), exposure(e), gain(g),recording(false){
+LedsFinder::LedsFinder(int port, int t, float s, int b, int e, float g, bool max) : port(port), threshold(t), shutter(s), brightness(b), exposure(e), gain(g),recording(false){
 	bzero((char *) &ClientAddress, sizeof(ClientAddress));
-
+    this->max_ = max;
     ClientAddress.sin_family = AF_INET;
     ClientAddress.sin_addr.s_addr = INADDR_ANY;
     ClientAddress.sin_port = htons(port);
@@ -55,15 +55,30 @@ inline void LedsFinder::divByTwoRes(unsigned char* p, unsigned char* c, int widt
         int nw = width/2;
         int nh = height/2;
         //unsigned char* c = (unsigned char*)malloc(w * h/4);
-        for(int i = 0; i < nw; i++){
-            for(int j = 0; j < nh; j++){// Way too slow
+        if(max_){
+            for(int i = 0; i < nw; i++){
+                for(int j = 0; j < nh; j++){// Way too slow
+                //printf("%i\n", (2 * i * w + 2 * j));
+                c[j * nw + i]  = max(
+                                    max(
+                                        max(p[2 * j * width + 2 * i], p[2 * j * width + 2 * i + 1]),
+                                        p[(2 * j + 1) * width + 2 * i]),
+                                    p[(2 * j + 1) * width + 2 * i + 1]);
+                }
+            }
+        }
+        else{
+            for(int i = 0; i < nw; i++){
+                for(int j = 0; j < nh; j++){// Way too slow
                 //printf("%i\n", (2 * i * w + 2 * j));
                 c[j * nw + i]  =(p[2 * j * width + 2 * i] +
                                  p[2 * j * width + 2 * i + 1] +
                                  p[(2 * j + 1) * width + 2 * i] +
                                  p[(2 * j + 1) * width + 2 * i + 1])/4;
+                }
             }
         }
+        
     #endif
    // p = c;
 }
@@ -127,7 +142,7 @@ void LedsFinder::startProcessingLoop(){
         
         socketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
         
-        setsockopt(socketFileDescriptor, SOL_SOCKET, SO_REUSEADDR,(const char *)&opt,sizeof(int));
+        //setsockopt(socketFileDescriptor, SOL_SOCKET, SO_REUSEADDR,(const char *)&opt,sizeof(int));
 
         this->checkForErrorTCP(socketFileDescriptor, "ERROR opening socket");
         

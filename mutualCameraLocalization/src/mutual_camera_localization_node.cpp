@@ -23,7 +23,7 @@ namespace mutual_camera_localizator
  * Constructor of the Monocular Pose Estimation Node class
  *
  */
-MCLNode::MCLNode(): diffMax(ros::Duration(1))
+MCLNode::MCLNode(): diffMax(ros::Duration(1000000))
 {
   // Set up a dynamic reconfigure server.
   // This should be done before reading parameter server values.
@@ -123,21 +123,22 @@ bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
   LEDDetector::findLeds(image, region_of_interest_, 0, gaussian_sigma_, min_blob_area_,
                         max_blob_area_, max_width_height_distortion_, max_circular_distortion_,
                         detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
-                        camera_distortion_coeffs_, camera_matrix_P_);
+                        camera_distortion_coeffs_, camera_matrix_P_);hor_line_angle
                         */
   LEDDetector::LedFilteringTrypon(image, min_blob_area_, max_blob_area_, max_circular_distortion_,
-               radius_ratio_tolerance_, 
+               radius_ratio_tolerance_, ratio_int_tolerance_, hor_line_angle_,
                ratio_ellipse_min_, ratio_ellipse_max_,
                pos_ratio_, pos_ratio_tolerance_,
-               line_angle_tolerance_, 1,
+               line_angle_tolerance_, 0,
                            distorted_detection_centers_);
-  detected_led_positions.size();
+  //detected_led_positions.size();
+  //detected_led_positions = distorted_detection_centers_;
   /*if(camA)
     printf("camA- Nbr of leds: %i\n",(int)detected_led_positions.size());
   else
     printf("camB- Nbr of leds: %i\n",(int)detected_led_positions.size());*/
 
-  if (detected_led_positions.size() >= 2) // If found enough LEDs, Reinitialise
+  if (distorted_detection_centers_.size() >= 2) // If found enough LEDs, Reinitialise
   {
 
     //printf("P1: (%f, %f)\n",(float)detected_led_positions(0)(0),(float)detected_led_positions(0)(1));
@@ -147,15 +148,16 @@ bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
       image_vectors = &image_vectorsA_;
     else
       image_vectors = &image_vectorsB_;
-    unsigned num_image_points = detected_led_positions.size();
+    unsigned num_image_points = distorted_detection_centers_.size();
     (*image_vectors).resize(num_image_points);
     Eigen::Vector2d single_vector;
    
     for (unsigned i = 0; i < num_image_points; ++i){
-      single_vector(0) = (detected_led_positions(i)(0) - camera_projection_matrix_(0, 2)) / camera_projection_matrix_(0, 0);
-      single_vector(1) = (detected_led_positions(i)(1) - camera_projection_matrix_(1, 2)) / camera_projection_matrix_(1, 1);
-    
-      (*image_vectors)(i) = detected_led_positions(i);//single_vector;// / single_vector.norm();
+      single_vector(0) = (distorted_detection_centers_[i].x - camera_projection_matrix_(0, 2)) / camera_projection_matrix_(0, 0);
+      single_vector(1) = (distorted_detection_centers_[i].y - camera_projection_matrix_(1, 2)) / camera_projection_matrix_(1, 1);
+      
+      (*image_vectors)(i)(0) = distorted_detection_centers_[i].x;//single_vector;// / single_vector.norm();
+      (*image_vectors)(i)(1) = distorted_detection_centers_[i].y;
     }
   }
   else
@@ -204,9 +206,9 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
   // Get time at which the image was taken. This time is used to stamp the estimated pose and also calculate the position of where to search for the makers in the image
   //double time_to_predict = image_msg->header.stamp.toSec();
 
-  if (callDetectLed(image, camA)) // Only output the pose, if the pose was updated (i.e. a valid pose was found).
-  {
+  if (callDetectLed(image, camA)){ // Only output the pose, if the pose was updated (i.e. a valid pose was found).
     bool camB_ready = image_msg->header.stamp - camB_time_ <= diffMax;
+    //bool camB_ready = true;
     //If we are the camB we declare that we are ready
     if(!camA)
         camB_time_ = image_msg->header.stamp;
@@ -219,17 +221,18 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
     if(camA && camB_ready){
         //ROS_WARN("Let's shoot data!");
         Eigen::Vector2d ImageA1(image_vectorsA_(0)(0),  image_vectorsA_(0)(1)); 
-        Eigen::Vector2d ImageA2(image_vectorsA_(1)(0),  image_vectorsA_(1)(1)); 
+        Eigen::Vector2d ImageA2(image_vectorsA_(2)(0),  image_vectorsA_(2)(1)); 
 
         Eigen::Vector2d ImageB1(image_vectorsB_(0)(0),  image_vectorsB_(0)(1)); 
-        Eigen::Vector2d ImageB2(image_vectorsB_(1)(0),  image_vectorsB_(1)(1)); 
+        Eigen::Vector2d ImageB2(image_vectorsB_(2)(0),  image_vectorsB_(2)(1)); 
         //int fx = camera_matrix_K_[0][0];
         //int fy = camera_matrix_K_[1][1];
         Eigen::Vector2d fCam(camera_matrix_K_.at<double>(0, 0), camera_matrix_K_.at<double>(1, 1)); 
         Eigen::Vector2d pp(camera_matrix_K_.at<double>(0, 2), camera_matrix_K_.at<double>(1, 2)); 
         //Eigen::Vector2d pp(camera_matrix_K_.at<double>(0, 2) -  image.cols/2, camera_matrix_K_.at<double>(1, 2) - image.rows/2); 
         //Eigen::Vector2d pp(0, 0); 
-        //cout<<"PP: "<<pp<<endl;
+        //cout<<"ImageA1: "<<ImageA1<<endl;
+        //cout<<"ImageA2: "<<ImageA2<<endl;
         //double rdA, ldA, rdB, ldB;
        /* ldA = 0.13;
         rdA = 0.14;
@@ -310,7 +313,7 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
 }
 
 void MCLNode::initMarker(){
-    marker_pose_.header.frame_id = "/cubeA";
+    marker_pose_.header.frame_id = "/cubeB";
     marker_pose_.id = 0;
     marker_pose_.type = visualization_msgs::Marker::CUBE;
     marker_pose_.lifetime = ros::Duration();
@@ -339,10 +342,11 @@ void MCLNode::dynamicParametersCallback(mutual_camera_localization::MutualCamera
   ldB_ = config.pos_left_led_cam_b; rdB_ = config.pos_right_led_cam_b;
 
   line_angle_tolerance_ = config.line_angle_tolerance;
+  hor_line_angle_ = config.hor_line_angle;
   pos_ratio_tolerance_ = config.pos_ratio_tolerance;
   pos_ratio_ = config.pos_ratio;
   radius_ratio_tolerance_ = config.radius_ratio_tolerance;
-  min_avg_led_int_ = config.min_avg_led_int;
+  ratio_int_tolerance_ = config.ratio_int_tolerance;
   ratio_ellipse_max_ = config.ratio_ellipse_max;
   ratio_ellipse_min_ = config.ratio_ellipse_min;
 
@@ -416,6 +420,7 @@ Eigen::MatrixXd MCLNode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Ei
   PAM1.normalize();
   PAM2.normalize();
   double alpha = acos(PAM1.dot(PAM2));
+  printf("Alpha: %f\n",alpha);
 
   double d = rdA + ldA;
 
@@ -431,6 +436,7 @@ Eigen::MatrixXd MCLNode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Ei
   PB12.normalize();
   double phi = acos(PB12[0]);
   double beta = 0.5f * M_PI - phi;
+  printf("Beta: %f\n",beta);
 
   Eigen::Vector2d plane = ComputePositionMutual(alpha, beta, d);
 

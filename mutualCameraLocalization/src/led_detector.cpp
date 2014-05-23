@@ -20,14 +20,11 @@ namespace mutual_camera_localizator
 typedef Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> List2DPoints; //!< A dynamic column vector containing Vector2D elements. \see Vector2d
 
 void LEDDetector::LedFilteringTrypon(const cv::Mat &gaussian_image, const double &min_blob_area, const double &max_blob_area, const double &max_circular_distortion,
-               const double &radius_ratio_tolerance, 
+               const double &radius_ratio_tolerance, const double &intensity_ratio_tolerance, const double &max_deviation_horizontal,
                const double &min_ratio_ellipse, const double &max_ratio_ellipse,
                const double &distance_ratio, const double &distance_ratio_tolerance,
-               const double &acos_tolerance, int OutputFlag, const double &acos_tolerance
+               const double &acos_tolerance, int OutputFlag,
                            std::vector<cv::Point2f> &distorted_detection_centers) {
-
-  distorted_detection_centers.clear();
-  std::vector<cv::Point2f> detection_centers;
   bool FoundLEDs = false; // Flag to indicate if we have found the LEDs or not
   cv::Rect ROI= cv::Rect(0,0,gaussian_image.cols,gaussian_image.rows);
 
@@ -40,6 +37,7 @@ void LEDDetector::LedFilteringTrypon(const cv::Mat &gaussian_image, const double
     int DataIndex = 1; // For matlab-compatible output, when chasing the parameters.
   
     std::vector<cv::Point2f> KeptContoursPosition;
+    std::vector<cv::Point2f> detection_centers;
     std::vector<double> KeptRadius, KeptAvgIntensity;
 
     // Identify the blobs in the image
@@ -100,9 +98,9 @@ void LEDDetector::LedFilteringTrypon(const cv::Mat &gaussian_image, const double
   //   -And similar radii
   int nBlob = KeptContoursPosition.size();
   cv::Point vec1, vec2, vec3, shortArm, longArm;
-  double norm1, norm2, norm3, cosArms;
+  double norm1, norm2, norm3, cosArms, horizontal;
   int index;
-  double RatioRadii, RatioDistance, minDist, maxDist, maxIntensity=0.0;
+  double RatioRadii, RatioDistance, RatioIntensity, minDist, maxDist, maxIntensity=0.0;
   int l1, l2, l3, BestCombo[3];
   for (l1 = 0; l1<(nBlob-2);l1++) {
       for (l2 = (l1+1); l2<(nBlob-1); l2++) {
@@ -111,7 +109,9 @@ void LEDDetector::LedFilteringTrypon(const cv::Mat &gaussian_image, const double
 
         // Test 1: Radius ratio tolerance
         // Let's start with the computations that take the least amount of time
-        RatioRadii = std::min(std::min(KeptRadius[l1],KeptRadius[l2]),KeptRadius[l3])/std::max(std::max(KeptRadius[l1],KeptRadius[l2]),KeptRadius[l3]);
+        // the 2.0 factor is to avoid the problematic case when the LEDS are very small
+        RatioRadii = (std::min(std::min(KeptRadius[l1],KeptRadius[l2]),KeptRadius[l3])+2.5) / 
+                   (std::max(std::max(KeptRadius[l1],KeptRadius[l2]),KeptRadius[l3])+2.5);
         if (std::abs(RatioRadii-1.0)>radius_ratio_tolerance) continue;
 
         // Ok now we have no choice. We have to compute the 3 vectors representing the 3-choose-2 combination of leds
@@ -122,7 +122,13 @@ void LEDDetector::LedFilteringTrypon(const cv::Mat &gaussian_image, const double
         norm2 = cv::norm(vec2);
         norm3 = cv::norm(vec3);
 
-        // Test 2: Led Distance tolerance
+        // Test 2: Led intensity ratio
+        RatioIntensity = std::min(KeptAvgIntensity[l1],std::min(KeptAvgIntensity[l2],KeptAvgIntensity[l3])) /
+                       std::max(KeptAvgIntensity[l1],std::max(KeptAvgIntensity[l2],KeptAvgIntensity[l3]));
+        
+        if (std::abs(RatioIntensity-1.0)>intensity_ratio_tolerance) continue;
+
+        // Test 3: Led Distance tolerance
         minDist = std::min(std::min(norm1,norm2),norm3);
         maxDist = std::max(std::max(norm1,norm2),norm3);
         RatioDistance = maxDist/minDist;
@@ -138,7 +144,12 @@ void LEDDetector::LedFilteringTrypon(const cv::Mat &gaussian_image, const double
         else if (maxDist == norm2) longArm = vec2;
         else longArm = vec3;
 
-        // Test 3: tolerance on the angle between the arms
+        // Test 4: tolerance on the horizontal
+        horizontal = longArm.dot(cv::Point(0,1))/(maxDist);
+        if (std::abs(horizontal)>max_deviation_horizontal) continue;
+            
+
+        // Test 5: tolerance on the angle between the arms
         cosArms = std::abs(shortArm.dot(longArm)/(minDist*maxDist));
         //double cosArms2 = std::abs(shortArm.dot(longArm)/(cv::norm(shortArm)*cv::norm(longArm)));
         //printf("combo %d %d %d has passed first 3 tests, with cos=%.2f, %.2f!\n",l1, l2, l3,cosArms, cosArms2);
@@ -146,9 +157,9 @@ void LEDDetector::LedFilteringTrypon(const cv::Mat &gaussian_image, const double
         if (val>acos_tolerance) continue;
         
 
-        // Test 4: we keep the one with the highest average intensity
+        // Test 6: we keep the one with the highest average intensity
         double sumIntensity = KeptAvgIntensity[l1]+KeptAvgIntensity[l2]+KeptAvgIntensity[l3];
-        if (sumIntensity > maxIntensity) {
+        if (sumIntensity>maxIntensity) {
           maxIntensity = sumIntensity;
           FoundLEDs = true;
           BestCombo[0] = l1;
@@ -161,52 +172,32 @@ void LEDDetector::LedFilteringTrypon(const cv::Mat &gaussian_image, const double
 
   if (FoundLEDs) {
     // We then push the best results
-    for (index = 0; index < 3; index++) {
+    for (index=0; index<3; index++) {
       detection_centers.push_back(KeptContoursPosition[BestCombo[index]]);
     }
 
+    
     // Order the dot from left to right
-    if(detection_centers[0].x <= detection_centers[1].x && detection_centers[0].x <= detection_centers[2].x){
-      distorted_detection_centers.push_back(detection_centers[0]);
-      if(detection_centers[1].x <= detection_centers[2].x){
-        distorted_detection_centers.push_back(detection_centers[1]);
-        distorted_detection_centers.push_back(detection_centers[2]);
+      cv::Point2f buf;
+      for(int i = 0; i < 2; i++){
+        if(detection_centers[0].x > detection_centers[1].x){
+    buf = detection_centers[0];
+    detection_centers[0] = detection_centers[1];
+    detection_centers[1] = buf;
+        }
+        if(detection_centers[1].x > detection_centers[2].x){
+    buf = detection_centers[1];
+    detection_centers[1] = detection_centers[2];
+    detection_centers[2] = buf;
+        }
       }
-      else{
-        distorted_detection_centers.push_back(detection_centers[2]);
-        distorted_detection_centers.push_back(detection_centers[1]);
-      }
-    }
-    else if(detection_centers[1].x <= detection_centers[0].x && detection_centers[1].x <= detection_centers[2].x){
-      distorted_detection_centers.push_back(detection_centers[1]);
-      if(detection_centers[0].x <= detection_centers[2].x){
-        distorted_detection_centers.push_back(detection_centers[0]);
-        distorted_detection_centers.push_back(detection_centers[2]);
-      }
-      else{
-        distorted_detection_centers.push_back(detection_centers[2]);
-        distorted_detection_centers.push_back(detection_centers[0]);
-      }
-    }
-    else{
-      distorted_detection_centers.push_back(detection_centers[2]);
-      if(detection_centers[0].x <= detection_centers[1].x){
-        distorted_detection_centers.push_back(detection_centers[0]);
-        distorted_detection_centers.push_back(detection_centers[1]);
-      }
-      else{
-        distorted_detection_centers.push_back(detection_centers[1]);
-        distorted_detection_centers.push_back(detection_centers[0]);
-      }
-    }
-
-  } 
-
-  else {
+      distorted_detection_centers = detection_centers;
+  } else {
     // We flush whatever was in there, to indicate that we didn't find anything.
     distorted_detection_centers.clear();
   }
 }
+
 
 // LED detector
 void LEDDetector::findLeds(const cv::Mat &image, cv::Rect ROI, const int &threshold_value, const double &gaussian_sigma,

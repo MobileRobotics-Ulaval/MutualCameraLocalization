@@ -48,6 +48,7 @@ private:
     static const int BUFFER = 1024;
     static const int WIDTH = 640;
     static const int HEIGHT = 480;
+    bool max_;
     char comBuffer[BUFFER];
     struct sockaddr_in ClientAddress;
     int comSocket;   
@@ -79,7 +80,7 @@ private:
 
 public:
     void takeRawPicture(int nbrPic, int threshold);
-    LedsFinder(int port, int threshold, float shutter, int brightness, int exposure, float gain);
+    LedsFinder(int port, int threshold, float shutter, int brightness, int exposure, float gain, bool max);
     ~LedsFinder();
     void startProcessingLoop();
     void sendProto(dotCapture::Img* message);
