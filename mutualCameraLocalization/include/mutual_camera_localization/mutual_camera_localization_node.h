@@ -68,6 +68,7 @@ private:
   image_transport::Publisher image_pubA_; //!< The ROS image publisher that publishes the visualisation image
   image_transport::Publisher image_pubB_; //!< The ROS image publisher that publishes the visualisation image
   ros::Publisher pose_pub_; //!< The ROS publisher that publishes the estimated pose.
+  ros::Publisher pose_pub_point_; //!< The ROS publisher that publishes the estimated pose.
 
   ros::Subscriber image_subA_; //!< The ROS subscriber to the raw camera image A
   ros::Subscriber image_subB_; //!< The ROS subscriber to the raw camera image B
@@ -86,6 +87,7 @@ private:
   //geometry_msgs::PoseWithCovarianceStamped predicted_pose_;
   //geometry_msgs::PoseStamped predicted_pose_;
   visualization_msgs::Marker marker_pose_;
+  visualization_msgs::Marker marker_arrow_;
   cv::Rect region_of_interest_;
   cv::Mat camera_matrix_K_; //!< Variable to store the camera matrix as an OpenCV matrix
   cv::Mat camera_matrix_P_; //!< Variable to store the projection matrix (as an OpenCV matrix) that projects points onto the rectified image plane.

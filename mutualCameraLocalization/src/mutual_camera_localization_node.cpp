@@ -39,6 +39,7 @@ MCLNode::MCLNode(): diffMax(ros::Duration(1000000))
   // Initialize pose publisher
   //pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("estimated_pose", 1);
   pose_pub_ = nh_.advertise<visualization_msgs::Marker>("estimated_pose", 1);
+  pose_pub_point_ = nh_.advertise<geometry_msgs::PoseStamped>("estimated_pose_arrow", 1);
   //pose_pub_ = nh_.advertise<nav_msgs::Odometry>("estimated_pose", 1);
   initMarker();
 
@@ -246,9 +247,9 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
                                                                rdA_, ldA_, rdB_, ldB_, &pos, &dist);
         //cout<<"fCam: "<<fCam<<endl;
         //cout<<"pp: "<<pp<<endl;
-        //cout<<"Position: "<<pos<<endl;
-        //cout<<"Distance: "<<dist<<endl;
-        //cout<<"Rotation: "<<rotation<<endl;
+        cout<<"Position: "<<pos<<endl;
+        cout<<"Distance: "<<dist<<endl;
+        cout<<"Rotation: "<<rotation<<endl;
 
         marker_pose_.header.stamp = ros::Time::now();
 
@@ -263,13 +264,30 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
         marker_pose_.pose.orientation.z = orientation.z();
         marker_pose_.pose.orientation.w = orientation.w();
 
+        /*
+        marker_arrow_.header.stamp = ros::Time::now();
+
+        marker_arrow_.points[1].x = pos[0];
+        marker_arrow_.points[1].y = pos[1];
+        marker_arrow_.points[1].z = pos[2];*/
+
+
         pose_pub_.publish(marker_pose_);
+
+        geometry_msgs::PoseStamped pos_packet;
+
+        pos_packet.header.frame_id = "/cubeB";
+        pos_packet.header.stamp = ros::Time::now();
+
+        pos_packet.pose = marker_pose_.pose;
+
+        pose_pub_point_.publish(pos_packet);
 
         /*broadcaster.sendTransform(
         tf::StampedTransform(
         marker_pose_,
         ros::Time::now(),"cubeA", "cubeB"));*/
-        tf::Transform transform;
+        /*tf::Transform transform;
         transform.setOrigin( tf::Vector3(marker_pose_.pose.position.x,
                                          marker_pose_.pose.position.y,
                                          marker_pose_.pose.position.z));
@@ -278,7 +296,7 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
                          marker_pose_.pose.orientation.z,
                          marker_pose_.pose.orientation.w);
         transform.setRotation(q);
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/cubeB", "/cubeA"));
+        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/cubeA", "/cubeB"));*/
         /*
         transform.setOrigin( tf::Vector3(0, 0, 0);
         transform.setRotation(tf::Quaternion(0, 0, 0) );
@@ -314,19 +332,44 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
 
 void MCLNode::initMarker(){
     marker_pose_.header.frame_id = "/cubeB";
-    marker_pose_.id = 0;
+    marker_pose_.ns = "arrows";
+    marker_pose_.id = 1;
     marker_pose_.type = visualization_msgs::Marker::CUBE;
     marker_pose_.lifetime = ros::Duration();
 
     marker_pose_.action = visualization_msgs::Marker::ADD;
-    marker_pose_.scale.x = 0.1;
-    marker_pose_.scale.y = 0.1;
-    marker_pose_.scale.z = 0.1;
+    marker_pose_.scale.x = 1;
+    marker_pose_.scale.y = 1;
+    marker_pose_.scale.z = 1;
 
     marker_pose_.color.r = 0.0f;
     marker_pose_.color.g = 1.0f;
     marker_pose_.color.b = 0.0f;
     marker_pose_.color.a = 1.0;
+/*
+    marker_arrow_.header.frame_id = "/arrow";
+    marker_arrow_.ns = "arrows";
+    marker_arrow_.id = 2;
+    marker_arrow_.type = visualization_msgs::Marker::ARROW;
+    marker_arrow_.lifetime = ros::Duration();
+
+    marker_arrow_.action = visualization_msgs::Marker::ADD;
+    marker_arrow_.scale.x = 1;
+    marker_arrow_.scale.y = 0.1;
+    marker_arrow_.scale.z = 0.1;
+
+    marker_arrow_.color.r = 1.0f;
+    marker_arrow_.color.g = 0.0f;
+    marker_arrow_.color.b = 0.0f;
+    marker_arrow_.color.a = 1.0;
+
+    geometry_msgs::Point p;
+      p.x = 0;
+      p.y = 0;
+      p.z = 0;
+
+    marker_arrow_.points.push_back(p);
+    marker_arrow_.points.push_back(p);*/
 }
 
 /**
@@ -415,6 +458,20 @@ Eigen::MatrixXd MCLNode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Ei
                                             Eigen::Vector2d fCamA, Eigen::Vector2d fCamB,
                                             double rdA, double ldA, double rdB, double ldB,
                                             Eigen::Vector3d* pos, double* dist){
+  cout<<"-Parameters-"<<endl;
+  cout<<"ImageA1:"<<ImageA1<<endl;
+  cout<<"ImageA2:"<<ImageA2<<endl;
+  cout<<"ImageB1:"<<ImageB1<<endl;
+  cout<<"ImageB2:"<<ImageB2<<endl;
+  cout<<"ppA:"<<ppA<<endl;
+  cout<<"ppB:"<<ppB<<endl;
+  cout<<"fCamA:"<<fCamA<<endl;
+  cout<<"fCamB:"<<fCamB<<endl;
+  cout<<"rdA:"<<rdA<<endl;
+  cout<<"ldA:"<<ldA<<endl;
+  cout<<"rdB:"<<rdB<<endl;
+  cout<<"ldB:"<<ldB<<endl;
+
   Eigen::Vector3d PAM1((ImageB1[0]-ppB[0])/fCamB[0], (ImageB1[1]-ppB[1])/fCamB[1], 1);
   Eigen::Vector3d PAM2((ImageB2[0]-ppB[0])/fCamB[0], (ImageB2[1]-ppB[1])/fCamB[1], 1);
   PAM1.normalize();
@@ -431,6 +488,8 @@ Eigen::MatrixXd MCLNode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Ei
   
   Eigen::Vector2d PB1(BLeftMarker[0] + (ldB/(rdB+ldB)) * (BRightMarker[0] - BLeftMarker[0]),
                       BLeftMarker[1] + (ldB/(rdB+ldB)) * (BRightMarker[1] - BLeftMarker[1]));
+
+  cout<<"PB1: "<<PB1<<endl;
   //cout << "BLeftMarker: \n" << BLeftMarker << endl;
   Eigen::Vector3d PB12((PB1[0]-ppA[0])/fCamA[0], (PB1[1]-ppA[1])/fCamA[1], 1);
   PB12.normalize();
@@ -440,6 +499,7 @@ Eigen::MatrixXd MCLNode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Ei
 
   Eigen::Vector2d plane = ComputePositionMutual(alpha, beta, d);
 
+  cout<<"plane: "<<plane<<endl;
   double EstimatedDistance = plane.norm();
 
   *pos =  PB12 * EstimatedDistance; 
