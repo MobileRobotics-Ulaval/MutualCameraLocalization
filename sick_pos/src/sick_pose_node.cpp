@@ -36,7 +36,7 @@ void SP::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_msg){
   	if(!receive_scan_){
 		ROS_INFO("Receiving scan!!!");
 		receive_scan_ = true;
-		toCVS(cloud);
+		//toCVS(cloud);
 	}
 
 
