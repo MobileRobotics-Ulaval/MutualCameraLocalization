@@ -124,20 +124,17 @@ bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
   LEDDetector::findLeds(image, region_of_interest_, 0, gaussian_sigma_, min_blob_area_,
                         max_blob_area_, max_width_height_distortion_, max_circular_distortion_,
                         detected_led_positions, distorted_detection_centers_, camera_matrix_K_,
-                        camera_distortion_coeffs_, camera_matrix_P_);hor_line_angle
+                        camera_distortion_coeffs_, camera_matrix_P_);
                         */
   LEDDetector::LedFilteringTrypon(image, min_blob_area_, max_blob_area_, max_circular_distortion_,
                radius_ratio_tolerance_, ratio_int_tolerance_, hor_line_angle_,
                ratio_ellipse_min_, ratio_ellipse_max_,
                pos_ratio_, pos_ratio_tolerance_,
                line_angle_tolerance_, 0,
-                           distorted_detection_centers_);
-  //detected_led_positions.size();
-  //detected_led_positions = distorted_detection_centers_;
-  /*if(camA)
-    printf("camA- Nbr of leds: %i\n",(int)detected_led_positions.size());
-  else
-    printf("camB- Nbr of leds: %i\n",(int)detected_led_positions.size());*/
+                           distorted_detection_centers_, undistorted_detection_centers_,
+                           camera_matrix_K_,
+                        camera_distortion_coeffs_, camera_matrix_P_);
+
 
   if (distorted_detection_centers_.size() >= 2) // If found enough LEDs, Reinitialise
   {
@@ -150,15 +147,15 @@ bool MCLNode::callDetectLed(cv::Mat image, const bool camA){
     else
       image_vectors = &image_vectorsB_;
     unsigned num_image_points = distorted_detection_centers_.size();
-    (*image_vectors).resize(num_image_points);
+    image_vectors->resize(num_image_points);
     Eigen::Vector2d single_vector;
    
     for (unsigned i = 0; i < num_image_points; ++i){
-      single_vector(0) = (distorted_detection_centers_[i].x - camera_projection_matrix_(0, 2)) / camera_projection_matrix_(0, 0);
-      single_vector(1) = (distorted_detection_centers_[i].y - camera_projection_matrix_(1, 2)) / camera_projection_matrix_(1, 1);
+      //single_vector(0) = (undistorted_detection_centers_[i].x - camera_projection_matrix_(0, 2)) / camera_projection_matrix_(0, 0);
+      //single_vector(1) = (undistorted_detection_centers_[i].y - camera_projection_matrix_(1, 2)) / camera_projection_matrix_(1, 1);
       
-      (*image_vectors)(i)(0) = distorted_detection_centers_[i].x;//single_vector;// / single_vector.norm();
-      (*image_vectors)(i)(1) = distorted_detection_centers_[i].y;
+      (*image_vectors)(i)(0) = undistorted_detection_centers_[i].x;//single_vector;// / single_vector.norm();
+      (*image_vectors)(i)(1) = undistorted_detection_centers_[i].y;
     }
   }
   else
@@ -251,25 +248,22 @@ void MCLNode::imageCallback(const sensor_msgs::Image::ConstPtr& image_msg, const
         cout<<"Distance: "<<dist<<endl;
         cout<<"Rotation: "<<rotation<<endl;
 
-        marker_pose_.header.stamp = ros::Time::now();
+        //marker_pose_.header.stamp = ros::Time::now();
 
-        marker_pose_.pose.position.x = pos[0];
-        marker_pose_.pose.position.y = pos[1];
-        marker_pose_.pose.position.z = pos[2];
+        marker_pose_.pose.position.x = pos[2];
+        marker_pose_.pose.position.y = pos[0];
+        marker_pose_.pose.position.z = -pos[1];
+        //Eigen::Quaterniond orientation = Eigen::Quaterniond(rotation * Eigen::AngleAxisd(0.5*M_PI, Eigen::Vector3d::UnitX() * Eigen::AngleAxisd(-0.5*M_PI, Eigen::Vector3d::UnitZ()));
         Eigen::Quaterniond orientation = Eigen::Quaterniond(rotation);
         //tf frame(cube) poseStamped odometry
         //cuba parent -  cubeB child_id
-        marker_pose_.pose.orientation.x = orientation.x();
-        marker_pose_.pose.orientation.y = orientation.y();
-        marker_pose_.pose.orientation.z = orientation.z();
+        marker_pose_.pose.orientation.x = orientation.z();
+        marker_pose_.pose.orientation.y = orientation.x();
+        marker_pose_.pose.orientation.z = -orientation.y();
         marker_pose_.pose.orientation.w = orientation.w();
 
-        /*
-        marker_arrow_.header.stamp = ros::Time::now();
+        marker_pose_.header.stamp = ros::Time::now();
 
-        marker_arrow_.points[1].x = pos[0];
-        marker_arrow_.points[1].y = pos[1];
-        marker_arrow_.points[1].z = pos[2];*/
 
 
         pose_pub_.publish(marker_pose_);
@@ -379,22 +373,25 @@ void MCLNode::dynamicParametersCallback(mutual_camera_localization::MutualCamera
   gaussian_sigma_ = config.gaussian_sigma;
   min_blob_area_ = config.min_blob_area;
   max_blob_area_ = config.max_blob_area;
-  max_width_height_distortion_ = config.max_width_height_distortion;
   max_circular_distortion_ = config.max_circular_distortion;
+  ratio_ellipse_min_ = config.ratio_ellipse_min;
+  ratio_ellipse_max_ = config.ratio_ellipse_max;
+  pos_ratio_ = config.pos_ratio;
+  pos_ratio_tolerance_ = config.pos_ratio_tolerance;
+  line_angle_tolerance_ = config.line_angle_tolerance;
+  hor_line_angle_ = config.hor_line_angle;
+
+  radius_ratio_tolerance_ = config.radius_ratio_tolerance;
+  ratio_int_tolerance_ = config.ratio_int_tolerance;
+
   ldA_ = config.pos_left_led_cam_a; rdA_ = config.pos_right_led_cam_a;
   ldB_ = config.pos_left_led_cam_b; rdB_ = config.pos_right_led_cam_b;
 
-  line_angle_tolerance_ = config.line_angle_tolerance;
-  hor_line_angle_ = config.hor_line_angle;
-  pos_ratio_tolerance_ = config.pos_ratio_tolerance;
-  pos_ratio_ = config.pos_ratio;
-  radius_ratio_tolerance_ = config.radius_ratio_tolerance;
-  ratio_int_tolerance_ = config.ratio_int_tolerance;
-  ratio_ellipse_max_ = config.ratio_ellipse_max;
-  ratio_ellipse_min_ = config.ratio_ellipse_min;
+  //max_width_height_distortion_ = config.max_width_height_distortion;
+  //radius_ratio_tolerance_ = config.radius_ratio_tolerance;
+  //ratio_int_tolerance_ = config.ratio_int_tolerance;
 
   ROS_INFO("Parameters changed");
-  
 }
 
 
@@ -458,7 +455,7 @@ Eigen::MatrixXd MCLNode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Ei
                                             Eigen::Vector2d fCamA, Eigen::Vector2d fCamB,
                                             double rdA, double ldA, double rdB, double ldB,
                                             Eigen::Vector3d* pos, double* dist){
-  cout<<"-Parameters-"<<endl;
+  /*cout<<"-Parameters-"<<endl;
   cout<<"ImageA1:"<<ImageA1<<endl;
   cout<<"ImageA2:"<<ImageA2<<endl;
   cout<<"ImageB1:"<<ImageB1<<endl;
@@ -470,7 +467,7 @@ Eigen::MatrixXd MCLNode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Ei
   cout<<"rdA:"<<rdA<<endl;
   cout<<"ldA:"<<ldA<<endl;
   cout<<"rdB:"<<rdB<<endl;
-  cout<<"ldB:"<<ldB<<endl;
+  cout<<"ldB:"<<ldB<<endl;*/
 
   Eigen::Vector3d PAM1((ImageB1[0]-ppB[0])/fCamB[0], (ImageB1[1]-ppB[1])/fCamB[1], 1);
   Eigen::Vector3d PAM2((ImageB2[0]-ppB[0])/fCamB[0], (ImageB2[1]-ppB[1])/fCamB[1], 1);
@@ -489,7 +486,7 @@ Eigen::MatrixXd MCLNode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Ei
   Eigen::Vector2d PB1(BLeftMarker[0] + (ldB/(rdB+ldB)) * (BRightMarker[0] - BLeftMarker[0]),
                       BLeftMarker[1] + (ldB/(rdB+ldB)) * (BRightMarker[1] - BLeftMarker[1]));
 
-  cout<<"PB1: "<<PB1<<endl;
+  //cout<<"PB1: "<<PB1<<endl;
   //cout << "BLeftMarker: \n" << BLeftMarker << endl;
   Eigen::Vector3d PB12((PB1[0]-ppA[0])/fCamA[0], (PB1[1]-ppA[1])/fCamA[1], 1);
   PB12.normalize();
@@ -499,7 +496,7 @@ Eigen::MatrixXd MCLNode::Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Ei
 
   Eigen::Vector2d plane = ComputePositionMutual(alpha, beta, d);
 
-  cout<<"plane: "<<plane<<endl;
+  //cout<<"plane: "<<plane<<endl;
   double EstimatedDistance = plane.norm();
 
   *pos =  PB12 * EstimatedDistance; 
@@ -561,21 +558,13 @@ int main(int argc, char* argv[])
 
   mutual_camera_localizator::MCLNode mpe_node;
   ros::spin();
-
-  return 0;
-  /*
   //Eigen::Matrix<double, 3, 4> m;
-  Eigen::Vector2d ImageA1(43.2675,  -230.8107); // En colonne
-  Eigen::Vector2d ImageA2(-117.6621,  -184.6691); 
+  /*Eigen::Vector2d ImageA1(-4.6882,  -2.9915); // En colonne
+  Eigen::Vector2d ImageA2(-4.6299,  -2.8090); 
 
-  Eigen::Vector2d ImageB1( 66.7481,  72.4816); // En colonne
-  Eigen::Vector2d ImageB2(-221.8502,  153.4686); 
- /* Eigen::Vector2d ImageA1(595.8564,  27.7171); // En colonne
-  Eigen::Vector2d ImageA2(516.2996,  -26.9985); 
-
-  Eigen::Vector2d ImageB1(144.2211,  56.6879); // En colonne
-  Eigen::Vector2d ImageB2(46.9843,  -19.3582); 
-  int f = 1000;
+  Eigen::Vector2d ImageB1(-3.7757, 2.147); // En colonne
+  Eigen::Vector2d ImageB2(2.0148,  -1.0384); 
+  double f = 1000.0;
   double d = 80;
 
   Eigen::Vector2d fCam(f,  f); 
@@ -588,9 +577,11 @@ int main(int argc, char* argv[])
   Eigen::Vector3d pos(0,0,0);
   double dist;
 
-  Eigen::MatrixXd rotation = Compute3DMutualLocalisation(ImageA1, ImageA2, ImageB1, ImageB2, pp, pp, fCam, fCam, rdA, ldA, rdB, ldB, &pos, &dist);
+  Eigen::MatrixXd rotation = mutual_camera_localizator::MCLNode::Compute3DMutualLocalisation(ImageA1*1000.0, ImageA2*1000.0, ImageB1*10000.0, ImageB2*10000000.0, pp, pp, fCam, fCam, rdA, ldA, rdB, ldB, &pos, &dist);
   
   cout<<"Position: "<<pos<<endl;
   cout<<"Distance: "<<dist<<endl;
   cout<<"Rotation: "<<rotation<<endl;*/
+
+  return 0;
 }

@@ -93,6 +93,7 @@ private:
   cv::Mat camera_matrix_P_; //!< Variable to store the projection matrix (as an OpenCV matrix) that projects points onto the rectified image plane.
   std::vector<double> camera_distortion_coeffs_; //!< Variable to store the camera distortion parameters
   std::vector<cv::Point2f> distorted_detection_centers_;
+  std::vector<cv::Point2f> undistorted_detection_centers_;
   Eigen::Matrix<double, 3, 4> camera_projection_matrix_; //!< Stores the camera calibration matrix. This is the 3x4 projection matrix that projects the world points to the image coordinates stored in #image_points_.
   Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_vectorsA_;
   Eigen::Matrix<Eigen::Vector2d, Eigen::Dynamic, 1> image_vectorsB_;
@@ -101,17 +102,19 @@ private:
   double gaussian_sigma_;
   double min_blob_area_;
   double max_blob_area_;
-  double max_width_height_distortion_;
   double max_circular_distortion_;
-  double rdA_, ldA_, rdB_, ldB_;
-  double line_angle_tolerance_;
-  double hor_line_angle_;
-  double pos_ratio_tolerance_;
-  double pos_ratio_;
-  double radius_ratio_tolerance_;
-  double ratio_int_tolerance_;
-  double ratio_ellipse_max_;
   double ratio_ellipse_min_;
+  double ratio_ellipse_max_;
+  double pos_ratio_;
+  double pos_ratio_tolerance_;
+  double line_angle_tolerance_;
+  double hor_line_angle_; 
+  double radius_ratio_tolerance_;
+  double ratio_int_tolerance_; 
+  double rdA_, ldA_, rdB_, ldB_;
+  //double max_width_height_distortion_;
+  //double radius_ratio_tolerance_;
+  //double ratio_int_tolerance_;
 public:
 
   MCLNode();
@@ -126,9 +129,9 @@ public:
   void initMarker();
 
 
-  Eigen::Vector2d ComputePositionMutual(double alpha, double beta, double d);
-  Eigen::MatrixXd vrrotvec2mat(double p, Eigen::Vector3d r);
-  Eigen::MatrixXd Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Eigen::Vector2d ImageA2,
+  static Eigen::Vector2d ComputePositionMutual(double alpha, double beta, double d);
+  static Eigen::MatrixXd vrrotvec2mat(double p, Eigen::Vector3d r);
+  static Eigen::MatrixXd Compute3DMutualLocalisation(Eigen::Vector2d ImageA1, Eigen::Vector2d ImageA2,
                                             Eigen::Vector2d ImageB1, Eigen::Vector2d ImageB2,
                                             Eigen::Vector2d ppA, Eigen::Vector2d ppB,
                                             Eigen::Vector2d fCamA, Eigen::Vector2d fCamB,

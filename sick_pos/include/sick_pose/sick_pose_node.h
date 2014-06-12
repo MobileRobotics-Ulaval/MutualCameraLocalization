@@ -29,7 +29,8 @@ public:
 	void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_msg);
 	std::vector<Eigen::Vector2d> findCube(std::vector<geometry_msgs::Point32> &data);
 	Eigen::Vector2d ComputeCubeCenter(Eigen::Vector2d Q1, Eigen::Vector2d Q2);
-	int SplitAndMerge(std::vector<Eigen::Vector2d> data, double & dist);
+  void ComputeCubeCenterWithLine(std::vector<Eigen::Vector2d> pointsInLine, int begin, int end, Eigen::Vector2d & p1,  Eigen::Vector2d & p2, std::vector<geometry_msgs::Point32> &data);
+  int SplitAndMerge(std::vector<Eigen::Vector2d> data, double & dist);
   double smallestAngle(double old, double next);
 
 	void initMarker();
@@ -46,16 +47,22 @@ private:
   ros::Publisher marker_pub_;
   ros::Publisher cubeA_pub_;
   ros::Publisher cubeB_pub_;
+  ros::Publisher marker_cubeA_pub_;
+  ros::Publisher marker_cubeB_pub_;
   ros::Publisher scan_aug_pub_;
   ros::Publisher zone_pub_;
+  ros::Publisher cube_poly_pub_;
   ros::Subscriber laser_scan_;
+
+  geometry_msgs::PolygonStamped zone;
 
   ros::NodeHandle n_;
   laser_geometry::LaserProjection projector_;
   tf::TransformListener listener_;
   message_filters::Subscriber<sensor_msgs::LaserScan> laser_sub_;
 
-  visualization_msgs::Marker planes_;
+  visualization_msgs::Marker cubeA_marker_;
+  visualization_msgs::Marker cubeB_marker_;
   geometry_msgs::PoseStamped pose_;
   //tf::MessageFilter<sensor_msgs::LaserScan> laser_notifier_;
 

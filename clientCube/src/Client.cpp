@@ -9,12 +9,10 @@ using namespace std;
 */
 Client::Client(): recording(false){
     image_transport::ImageTransport it(nh);
-    //nh.setParam("~cubeid", "A");
-    //nh.setParam("~address", "127.0.0.1");
-    //nh.setParam("~port", 5005);
-    string cubeid;
+    
     string address;
     int port;
+    string cubeid;
     ros::param::get("~cubeid", cubeid);
     ros::param::get("~address", address);
     ros::param::get("~port", port);
@@ -28,11 +26,11 @@ Client::Client(): recording(false){
 
 	comSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (comSocket < 0) 
-        printf("ERROR opening socket\n");
+        ROS_ERROR("ERROR opening socket");
         
    struct hostent *host = gethostbyname(address.c_str());
     if (host == NULL) 
-        printf("ERROR, no such host\n");
+        ROS_ERROR("ERROR, no such host");
         
     bzero((char *) &server, sizeof(server));
     server.sin_family = AF_INET;
@@ -40,7 +38,7 @@ Client::Client(): recording(false){
     server.sin_port = htons(port);
     if (connect(comSocket,(struct sockaddr *) &server,sizeof(server)) < 0){
         //TODO add try again
-        printf("ERROR connecting to socket\n");
+        ROS_ERROR("ERROR connecting to socket");
         exit(0);
     }
 }
@@ -143,7 +141,7 @@ int Client::startListeningLoop(){
         }
 
     }while(flag);
-    printf("End of program\n");
+    ROS_INFO("End of program");
 
     close(comSocket);
 
@@ -169,7 +167,7 @@ int Client::sendCommand(dotCapture::Command &com){
     com.SerializeToCodedStream(&codedOut);
     int c = send(comSocket, ackBuf, ackSize, 0);
     if(c < 0){
-        printf("Error: Impossible d'envoyer");
+        ROS_ERROR("Error: Impossible to send packet");
     }
     delete(ackBuf);
 }
@@ -259,7 +257,7 @@ void* Client::receivingImgLoop(){
         google::protobuf::io::CodedInputStream codedIn(&arrayIn);
         google::protobuf::io::CodedInputStream::Limit msgLimit = codedIn.PushLimit(received);
         if(!message.ParseFromCodedStream(&codedIn)){
-            printf("Can't parse img\n");
+            ROS_ERROR("Can't parse img");
             exit(0);
         }
         codedIn.PopLimit(msgLimit);
@@ -270,7 +268,7 @@ void* Client::receivingImgLoop(){
 
         sizeLz4 = LZ4_decompress_safe((char*)(void*)(data), (char*)(void*)(iz4BuffDecod), message.mutable_image()->size(), WIDTH * HEIGHT);
         
-        printf("#%i img  %do\n", i, (int)message.mutable_image()->size());
+        ROS_INFO("#%i img  %do", i, (int)message.mutable_image()->size());
         
         
         cvSetData(pImg, iz4BuffDecod, pImg->widthStep);
@@ -292,7 +290,7 @@ void* Client::receivingImgLoop(){
         //loop_rate.sleep();
         free(buffer);
     }
-    printf("Images total =%i\n", i);
+    ROS_INFO("Img total =%i", i);
 }
 
 
@@ -334,7 +332,7 @@ void Client::foo(){
     string filename;
     ros::param::get("~filename", filename);
     unsigned error = lodepng_decode_file(&pngBuf, &width, &height, filename.c_str(), LCT_GREY,  8);
-    if(error) printf("error %u: %s\n", error, lodepng_error_text(error));
+    if(error) ROS_ERROR("error %u: %s", error, lodepng_error_text(error));
 
     cvSetData(pImg, pngBuf, pImg->widthStep);
 
@@ -354,7 +352,7 @@ void Client::foo(){
         loop_rate.sleep();
     }
     free(pngBuf);
-    printf("Images total =%i\n", i);
+    ROS_INFO("Images total =%i", i);
 }
 
 
@@ -366,7 +364,7 @@ void Client::compressToPNG(unsigned char**& pngBuf, size_t* pngSize, const unsig
     int error = lodepng_encode_memory(pngBuf, pngSize, imgBuf, WIDTH, HEIGHT, LCT_GREY,  8);
 
     if(error){
-        printf("Error %u: %s\n", error, lodepng_error_text(error));
+        ROS_ERROR("Error %u: %s", error, lodepng_error_text(error));
         exit(0);
     }
     //printf("Compression success!!\npng=%.3fko raw=%.3fko\n", (float)*pngSize/1000.f, (float)size/1000.f);

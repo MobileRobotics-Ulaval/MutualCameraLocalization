@@ -24,7 +24,9 @@ void LEDDetector::LedFilteringTrypon(const cv::Mat &gaussian_image, const double
                const double &min_ratio_ellipse, const double &max_ratio_ellipse,
                const double &distance_ratio, const double &distance_ratio_tolerance,
                const double &acos_tolerance, int OutputFlag,
-                           std::vector<cv::Point2f> &distorted_detection_centers) {
+                           std::vector<cv::Point2f> &distorted_detection_centers,  std::vector<cv::Point2f> & undistorted_detection_centers,
+                           const cv::Mat &camera_matrix_K, const std::vector<double> &camera_distortion_coeffs,
+                           const cv::Mat &camera_matrix_P) {
   bool FoundLEDs = false; // Flag to indicate if we have found the LEDs or not
   cv::Rect ROI= cv::Rect(0,0,gaussian_image.cols,gaussian_image.rows);
 
@@ -181,17 +183,24 @@ void LEDDetector::LedFilteringTrypon(const cv::Mat &gaussian_image, const double
       cv::Point2f buf;
       for(int i = 0; i < 2; i++){
         if(detection_centers[0].x > detection_centers[1].x){
-    buf = detection_centers[0];
-    detection_centers[0] = detection_centers[1];
-    detection_centers[1] = buf;
+          buf = detection_centers[0];
+          detection_centers[0] = detection_centers[1];
+          detection_centers[1] = buf;
         }
         if(detection_centers[1].x > detection_centers[2].x){
-    buf = detection_centers[1];
-    detection_centers[1] = detection_centers[2];
-    detection_centers[2] = buf;
+          buf = detection_centers[1];
+          detection_centers[1] = detection_centers[2];
+          detection_centers[2] = buf;
         }
       }
+       std::vector<cv::Point2f> undistorted_points;
+
+    // Undistort the points
       distorted_detection_centers = detection_centers;
+    cv::undistortPoints(detection_centers, undistorted_points, camera_matrix_K, camera_distortion_coeffs, cv::noArray(),
+                        camera_matrix_P);
+      undistorted_detection_centers = undistorted_points;
+      //distorted_detection_centers = detection_centers;
   } else {
     // We flush whatever was in there, to indicate that we didn't find anything.
     distorted_detection_centers.clear();

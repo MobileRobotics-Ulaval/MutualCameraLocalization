@@ -21,8 +21,10 @@ SP::SP(ros::NodeHandle n) :
     cubeB_pub_ = n_.advertise<geometry_msgs::PoseStamped>("/cubeB_pose",1);
     scan_aug_pub_ = n_.advertise<sensor_msgs::PointCloud>("/scan_augment",1);
     zone_pub_ = n_.advertise<geometry_msgs::PolygonStamped>("/zone",1);
+    cube_poly_pub_ = n_.advertise<geometry_msgs::PolygonStamped>("/cube_poly",1);
 
-    //marker_pub_ = n.advertise<visualization_msgs::Marker>("planes", 10);
+    marker_cubeA_pub_ = n.advertise<visualization_msgs::Marker>("/cubeA_marker", 10);
+    marker_cubeB_pub_ = n.advertise<visualization_msgs::Marker>("/cubeB_marker", 10);
 
     initMarker();
 }
@@ -57,6 +59,8 @@ void SP::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_msg){
         pose_.pose.orientation.z = orientation.z();
         pose_.pose.orientation.w = orientation.w();
 
+        cubeA_marker_.pose = pose_.pose;
+		marker_cubeA_pub_.publish(cubeA_marker_);
 		cubeA_pub_.publish(pose_);
 
 		//Samething for cube B
@@ -70,6 +74,8 @@ void SP::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_msg){
         pose_.pose.orientation.z = orientation.z();
         pose_.pose.orientation.w = orientation.w();
 
+        cubeB_marker_.pose = pose_.pose;
+		marker_cubeB_pub_.publish(cubeB_marker_);
 		cubeB_pub_.publish(pose_);
 
 		if(missing_association[0] + missing_association[1] > 0)
@@ -118,10 +124,12 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 		if(!((p_data[i].x > front_wall) || (p_data[i].x < back_wall) || (p_data[i].y > left_wall) || (p_data[i].y < right_wall))
 			&& !((p_data[i].x > front_room_delim) && (p_data[i].y < left_room_delim))){
 			data.push_back(Eigen::Vector2d(p_data[i].x, p_data[i].y));
-			pointss.push_back(p_data[i]);
+			//pointss.push_back(p_data[i]);
 		}
 	}
-	p_data = pointss;
+
+	p_data.clear();
+	//p_data = pointss;
 	if(data.size() == 0){
 		ROS_INFO("No dot found!!!");
 		vector<Eigen::Vector2d> c;
@@ -173,10 +181,10 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 	int SplitIndex;
 	vector<Eigen::Vector2d> CubeCenter;
 	Eigen::Vector2d zeroAngularVector(1,0);
-	Eigen::Vector2d Center1, Center2;
+	Eigen::Vector2d p1, p2;
 
 	double lengthLeft, lengthRight;
-
+	zone.polygon.points.clear();
 	std::vector<double> anglesCluster;
 	double angle;
 	for(int iCluster = 0;  iCluster < KeptCluster.size(); iCluster++){
@@ -188,40 +196,40 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 	        // point to figure out the line segment
 	        lengthLeft = (KeptCluster[iCluster][0] - KeptCluster[iCluster][SplitIndex]).norm();
 	        lengthRight = (KeptCluster[iCluster][SplitIndex] - KeptCluster[iCluster].back()).norm();
-	        if( lengthLeft > 1.5 && lengthRight > 1.5){
-	        	//Center part
-		        Center1 = ComputeCubeCenter(KeptCluster[iCluster][0],KeptCluster[iCluster][SplitIndex]);
-		        Center2 = ComputeCubeCenter(KeptCluster[iCluster][SplitIndex],KeptCluster[iCluster].back());
 
-		        CubeCenter.push_back(0.5*(Center1+Center2));
-		        //Angle part
-		        //We take the longuest side to plot the angle
-		        //if(lengthLeft > lengthRight)
-		        	//angle = 
-		        //anglesCluster.push_back(angle);
-		        if(SplitIndex > KeptCluster[iCluster].size() - SplitIndex)
-		        	anglesCluster.push_back(M_PI/2.0 - acos((KeptCluster[iCluster][0] - KeptCluster[iCluster][SplitIndex]).dot(zeroAngularVector)/lengthLeft));
-		        else
-		        	anglesCluster.push_back(M_PI/2.0 - acos((KeptCluster[iCluster][SplitIndex] - KeptCluster[iCluster].back()).dot(zeroAngularVector)/lengthRight));
+	        if( lengthLeft > 1.5 && lengthRight > 1.5){
+		        /*if(SplitIndex > KeptCluster[iCluster].size() - SplitIndex){
+		        	ComputeCubeCenterWithLine(KeptCluster[iCluster], 0, SplitIndex, p1, p2, p_data);
+		        }
+		        else{
+		        	ComputeCubeCenterWithLine(KeptCluster[iCluster], SplitIndex, KeptCluster[iCluster].size() - 1, p1, p2, p_data);
+		        }*/
+		       ComputeCubeCenterWithLine(KeptCluster[iCluster], 0, SplitIndex, p1, p2, p_data);
+				Eigen::Vector2d centerA = ComputeCubeCenter(p1, p2);
+		       	ComputeCubeCenterWithLine(KeptCluster[iCluster], SplitIndex, KeptCluster[iCluster].size() - 1, p1, p2, p_data);
+	    		CubeCenter.push_back((ComputeCubeCenter(p1, p2) - centerA) * 0.5 + centerA);
+
 		        //ROS_INFO("Angle:%f", anglesCluster.back());
 	        }
-	        else if(lengthLeft > 1.5){
-		        CubeCenter.push_back(ComputeCubeCenter(KeptCluster[iCluster][0],KeptCluster[iCluster][SplitIndex]));
-		        anglesCluster.push_back(M_PI/2.0 - acos((KeptCluster[iCluster][0] - KeptCluster[iCluster][SplitIndex]).dot(zeroAngularVector)/lengthLeft));
-		        //ROS_INFO("Angle:%f", anglesCluster.back());
+	        else if(lengthLeft > 1.5 && SplitIndex > 13){
+		        ComputeCubeCenterWithLine(KeptCluster[iCluster], 0, SplitIndex, p1, p2, p_data);
+	    		CubeCenter.push_back(ComputeCubeCenter(p1, p2));
 	        }
-	        else if(lengthRight > 1.5){
-		        CubeCenter.push_back(ComputeCubeCenter(KeptCluster[iCluster][SplitIndex],KeptCluster[iCluster].back()));
-		        anglesCluster.push_back(M_PI/2.0 - acos((KeptCluster[iCluster][SplitIndex] - KeptCluster[iCluster].back()).dot(zeroAngularVector)/lengthRight));
-		       // ROS_INFO("Angle:%f", anglesCluster.back());
+	        //else if(lengthRight > 1.5 && KeptCluster[iCluster].size() - SplitIndex > 13){
+	        else{
+		        ComputeCubeCenterWithLine(KeptCluster[iCluster], SplitIndex, KeptCluster[iCluster].size() - 1, p1, p2, p_data);
+	    		CubeCenter.push_back(ComputeCubeCenter(p1, p2));
 	        }
 	    }
 	    else{
 	        // we have one line
-	        CubeCenter.push_back(ComputeCubeCenter(KeptCluster[iCluster][0], KeptCluster[iCluster].back()));
-	        anglesCluster.push_back(M_PI/2.0 - acos((KeptCluster[iCluster][0] - KeptCluster[iCluster].back()).dot(zeroAngularVector)/(KeptCluster[iCluster][0] - KeptCluster[iCluster].back()).norm()));
-		    //ROS_INFO("Angle:%f", anglesCluster.back());
+		     ComputeCubeCenterWithLine(KeptCluster[iCluster], 0, KeptCluster[iCluster].size() - 1, p1, p2, p_data);
+	    	CubeCenter.push_back(ComputeCubeCenter(p1, p2));
 	    }
+	    //CubeCenter.push_back(ComputeCubeCenter(p1, p2));
+
+	   // anglesCluster.push_back((p1 - p2)[1]/abs((p1 - p2)[1]) * acos((p1 - p2)[0]/(p1 - p2).norm()));
+	    anglesCluster.push_back(atan2((p1 - p2)[1], (p1 - p2)[0]));
 	}
 
 	// if the cube are not already initiated
@@ -251,10 +259,10 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 
 					//We assign the vector to the cube and remove it from the stack
 					missing_association[index] = 0;
-					cubes[index] = (CubeCenter[nearest_id] - cubes[index])/2 + cubes[index];
+					cubes[index] = (CubeCenter[nearest_id] - cubes[index]) * 0.5 + cubes[index];
 					cubesAngles[index] = smallestAngle(cubesAngles[index], anglesCluster[nearest_id]);
 
-					// We erase from the stack that cluster
+					// We erase from the stack this center
 					CubeCenter.erase(CubeCenter.begin() + nearest_id);
 					anglesCluster.erase(anglesCluster.begin() + nearest_id);
 				}
@@ -292,6 +300,8 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 		}
 	}
 
+	zone.header.frame_id = "/laser";
+	cube_poly_pub_.publish(zone);
 	return CubeCenter;
 }
 
@@ -301,14 +311,19 @@ double wrap(double x){
 double SP::smallestAngle(double old, double next){
 	double a;
 	double best = -1;
+	//ROS_INFO("Angle old:%f", old * 180.0 / M_PI);
 	for(int i = 0; i < 4; i++){
-		a = next + i * M_PI/2.0; // a ; a+ 90; a+ 180 ...
+		a = next + i * M_PI * 0.5; // a ; a + 90; a + 180 ...
+		//ROS_INFO("%f", a * 180.0 / M_PI);
 		if(best == -1 || abs(wrap(a - old)) < abs(wrap(best - old))){
 			best = a;
 		}
 	}
+	//ROS_INFO("Best:%f / %f", best * 180.0 / M_PI, wrap(best) * 180.0 / M_PI);
+	//ROS_INFO("Best correction:%f", wrap(wrap(best - old)*0.5+ old) * 180.0 / M_PI);
 
 	return wrap(wrap(best - old)*0.5+ old);
+	//return best;
 }
 
 int SP::SplitAndMerge(vector<Eigen::Vector2d> data, double & dist){
@@ -334,6 +349,122 @@ int SP::SplitAndMerge(vector<Eigen::Vector2d> data, double & dist){
     
 }
 
+void SP::ComputeCubeCenterWithLine(vector<Eigen::Vector2d> pointsInLine, int begin, int end, Eigen::Vector2d & p1,  Eigen::Vector2d & p2, vector<geometry_msgs::Point32> &p_data){
+	//Eigen::linearRegression::linearRegression(end, &(pointsInLine[0]), &line_coeffs, 0);
+	// ===== linear Regression ==== 
+	// explication => http://onlinestatbook.com/2/regression/intro.html
+	//begin += 2;
+	//end -= 2;
+	geometry_msgs::Point32 dots;
+	dots.x = pointsInLine[begin][0];
+	dots.y = pointsInLine[begin][1];
+	p_data.push_back(dots);
+	dots.x = pointsInLine[end][0];
+	dots.y = pointsInLine[end][1];
+	p_data.push_back(dots);
+
+	vector<Eigen::Vector2d> ptsLine;
+	bool inverseXY = false;
+	// we inverse the x/y when the line is almost parrallele to the x's axe
+	Eigen::Vector2d delimeter = pointsInLine[end] - pointsInLine[begin];
+	if( atan(abs(delimeter[1]/delimeter[0])) > M_PI * 0.25 ){
+		inverseXY = true;
+		for(int i = begin; i < end; i++){
+			ptsLine.push_back(pointsInLine[i]);
+			ptsLine.back()[0] = pointsInLine[i][1];
+			ptsLine.back()[1] = pointsInLine[i][0];
+		}
+	}
+	else{
+		for(int i = begin; i < end; i++){
+			ptsLine.push_back(pointsInLine[i]);
+		}
+	}
+
+	// Line smoothing
+	/*
+	for(int i = 1; i < ptsLine.size() - 1; i++){
+		// If the distance between the dot before and after is too short, we erase it
+		if((ptsLine[i-1] - ptsLine[i+1]).norm() < 0.1){
+			ptsLine.erase(ptsLine.begin() + i);
+			i--;
+		}
+		else{
+			dots.x = ptsLine[i][0];
+			dots.y = ptsLine[i][1];
+			p_data.push_back(dots);
+		}
+
+	}*/
+
+	// Mean:
+	Eigen::Vector2d mean(0, 0);
+	for(int i = 0; i < ptsLine.size(); i++){
+		mean += ptsLine[i];
+	}
+	mean = mean / ptsLine.size();
+	//cout<<"Mean:\n" << mean << endl;
+
+	// "r" correlation:
+	double xy = 0;
+	double x2 = 0;
+	double y2 = 0;
+	for(int i = 0; i < ptsLine.size(); i++){
+		xy += (ptsLine[i][0] - mean[0]) * (ptsLine[i][1]- mean[1]);
+		x2 += (ptsLine[i][0] - mean[0]) * (ptsLine[i][0]- mean[0]);
+		y2 += (ptsLine[i][1] - mean[1]) * (ptsLine[i][1]- mean[1]);
+	}
+	double r = xy / sqrt(x2 * y2);
+
+	//cout<<"r:\n"<<r<<endl;
+
+	// Standard deviation:
+	Eigen::Vector2d s(0, 0);
+
+	for(int i = 0; i < ptsLine.size(); i++){
+		s[0] += (ptsLine[i][0]- mean[0]) * (ptsLine[i][0]- mean[0]);
+		s[1] += (ptsLine[i][1]- mean[1]) * (ptsLine[i][1]- mean[1]);
+	}
+	s = s/ptsLine.size();
+	s[0] = sqrt(s[0]);
+	s[1] = sqrt(s[1]);
+
+	//cout<<"standardDev:\n"<<s<<endl;
+
+	double b = r * s[1] / s[0];
+	double a = mean[1] - b * mean[0];
+
+	//Eigen::Vector2d line_coeffs( a, b);
+	//cout<<"a: "<<a<<"\nb: "<<b<<endl;
+
+	
+	Eigen::Vector2d lineV(1/sqrt(1+b*b), b/sqrt(1+b*b));
+	Eigen::Vector2d onTheLine(0,a);
+	geometry_msgs::Point32 pA, pB;
+
+	// We project the point on a line
+	p1 = (ptsLine[0] - onTheLine).dot(lineV)/lineV.dot(lineV) * lineV + onTheLine;
+	p2 = (ptsLine.back()   - onTheLine).dot(lineV)/lineV.dot(lineV) * lineV + onTheLine;
+	
+	if(inverseXY){
+		Eigen::Vector2d tampon;
+		tampon[0] = p1[1];
+		tampon[1] = p1[0];
+		p1 = tampon;
+		tampon[0] = p2[1];
+		tampon[1] = p2[0];
+		p2 = tampon;
+	}
+	// Rviz visualization
+	pA.x = p1[0];
+	pA.y = p1[1];
+	pB.x = p2[0];
+	pB.y = p2[1];
+	zone.polygon.points.push_back(pA);
+	zone.polygon.points.push_back(pB);
+
+	//return ComputeCubeCenter(vA, vB);
+}
 Eigen::Vector2d SP::ComputeCubeCenter(Eigen::Vector2d Q1, Eigen::Vector2d Q2){
     Eigen::Vector2d b = Q2-Q1;
     b.normalize();
@@ -361,16 +492,29 @@ Eigen::Vector2d SP::ComputeCubeCenter(Eigen::Vector2d Q1, Eigen::Vector2d Q2){
 
 
 void SP::initMarker(){
-    planes_.header.frame_id = pose_.header.frame_id = "laser";
+    cubeA_marker_.header.frame_id = pose_.header.frame_id = "/laser";
 
-    planes_.action = visualization_msgs::Marker::ADD;
-    planes_.pose.orientation.w = 1.0;
+    cubeA_marker_.action = visualization_msgs::Marker::ADD;
 
-    planes_.type = visualization_msgs::Marker::LINE_STRIP;
-    planes_.scale.x = 0.1;
+    cubeA_marker_.type = visualization_msgs::Marker::CUBE;
+    cubeA_marker_.scale.x = 2.25;
+    cubeA_marker_.scale.y = 2.25;
+    cubeA_marker_.scale.z = 2.25;
 
-    planes_.color.b = 1;
-    planes_.color.a = 1;
+    cubeA_marker_.color.b = 1;
+    cubeA_marker_.color.a = 0.5;
+
+    cubeB_marker_.header.frame_id = pose_.header.frame_id = "/laser";
+
+    cubeB_marker_.action = visualization_msgs::Marker::ADD;
+
+    cubeB_marker_.type = visualization_msgs::Marker::CUBE;
+    cubeB_marker_.scale.x = 2.25;
+    cubeB_marker_.scale.y = 2.25;
+    cubeB_marker_.scale.z = 2.25;
+
+    cubeB_marker_.color.r = 1;
+    cubeB_marker_.color.a = 0.5;
 }
 
 void SP::toCVS(sensor_msgs::PointCloud &cloud){

@@ -81,7 +81,9 @@ public:
                const double &min_ratio_ellipse, const double &max_ratio_ellipse,
                const double &distance_ratio, const double &distance_ratio_tolerance,
                const double &acos_tolerance, int OutputFlag,
-                           std::vector<cv::Point2f> &distorted_detection_centers);
+                           std::vector<cv::Point2f> &distorted_detection_centers,  std::vector<cv::Point2f> & undistorted_detection_centers,
+                           const cv::Mat &camera_matrix_K, const std::vector<double> &camera_distortion_coeffs,
+                           const cv::Mat &camera_matrix_P);
   /**
    * Calculates the region of interest (ROI) in the distorted image in which the points lie.
    *
