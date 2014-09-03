@@ -1,7 +1,6 @@
 #ifndef _LEDSFINDER_H_
 #define _LEDSFINDER_H_
 
-#include "FlyCapture2.h"
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include "proto/img.pb.h"
@@ -22,69 +21,56 @@
 #include <sstream>
 #include <cstdlib> // exit()
 #include <pthread.h>
+
+#include "Camera.h"
+
 #ifdef __arm__
     #include <arm_neon.h>
 #endif
-//#include <mutex>
-//#include <thread>
-//#include <chrono>
 
-using namespace FlyCapture2;
 
+namespace img_server
+{
 class LedsFinder
 {
 private:
-    // cam
-    Camera cam;
+    Camera camera;
     long time;
-    float shutter;
-    int brightness;
-    int exposure;
-    float gain;
-    int threshold;
 
     // TCP
-    const int port;
     static const int BUFFER = 1024;
     static const int WIDTH = 640;
     static const int HEIGHT = 480;
     bool max_;
     char comBuffer[BUFFER];
     struct sockaddr_in ClientAddress;
-    int comSocket;   
+    int comSocket;  
+    int socketFileDescriptor; 
 
     // Threading
     pthread_t imgGathering;
     pthread_mutex_t proprietyMux; 
     volatile bool recording;
     
-    void printErrorCam(Error error);
     void checkForErrorTCP(int errorCode, const char* errorMessage);
     long getTimeInMilliseconds();
-    dotCapture::Command*  getCommand();
-
-    void compressToPNG(unsigned char**& outBuf, size_t* outsize, const unsigned char *imgBuf, const int w, const int h);
-    void saveFilePNG(unsigned char* pngBuf, size_t pngSize, std::string filename);
+    dotCapture::Command* getCommand();
     dotCapture::Img* dataToProto(long timestamp, int timestamp_microsec, unsigned char* data, long unsigned int size);
-
-
-    int startRecording();
-    void stopRecording();
 
     static void* callLoopRecordingFunction(void *arg) { return ((LedsFinder*)arg)->loopRecording(); }
 
     void* loopRecording();
-    void configureProperties();
-    inline void doThreshold(Image& img, int t);
-    inline void divByTwoRes(unsigned char* p, unsigned char* c, int w, int h);
+
+    void configServerParameter(int port);
+    void waitingForClient();
+    void waitingForCommandFromClient();
+    void sendProto(dotCapture::Img* message);
 
 public:
-    void takeRawPicture(int nbrPic, int threshold);
-    LedsFinder(int port, int threshold, float shutter, int brightness, int exposure, float gain, bool max);
+    LedsFinder(int port, int threshold, float shutter, int brightness, int exposure, float gain);
     ~LedsFinder();
-    void startProcessingLoop();
-    void sendProto(dotCapture::Img* message);
+    void startServerLoop();
 };
-
+}
 #endif
 

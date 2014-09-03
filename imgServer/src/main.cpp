@@ -1,3 +1,4 @@
+#include "Camera.h"
 #include "LedsFinder.h"
 
 int main(int argc, char* argv[]){
@@ -7,12 +8,8 @@ int main(int argc, char* argv[]){
 	int exposure = 25;
 	float gain = 0.1f;
 
-	bool max = argc < 2;
-	    
-	printf("[SERVER] Start image server...\n");
-
-	LedsFinder ledsFinder(5005, threshold, shutter, brightness, exposure, gain, max);
+	img_server::LedsFinder ledsFinder(5005, threshold, shutter, brightness, exposure, gain);
 	//ledsFinder.takeRawPicture(1,threshold);
-	ledsFinder.startProcessingLoop();
+	ledsFinder.startServerLoop();
 	return 0;
 }

@@ -10,14 +10,15 @@ using namespace std;
 Client::Client(): recording(false){
     image_transport::ImageTransport it(nh);
     
-    string address;
+    string address, cubeid;
     int port;
-    string cubeid;
-    ros::param::get("~cubeid", cubeid);
     ros::param::get("~address", address);
     ros::param::get("~port", port);
 
-    pub = it.advertiseCamera("/camera" + cubeid + "/image_raw", 1);
+    ROS_INFO("Addresse: %s", address.c_str());
+    ROS_INFO("port: %i", port);
+
+    pub = it.advertiseCamera("/camera/image_raw", 1);
     //pub = it.advertiseCamera("/camera/image_raw", 1);
     //pub = nh.advertise<sensor_msgs::Image>("/cube_feed_topic", 1);
     //if(!nh.ok()){
@@ -36,9 +37,10 @@ Client::Client(): recording(false){
     server.sin_family = AF_INET;
     bcopy((char *)host->h_addr, (char *)&server.sin_addr.s_addr, host->h_length);
     server.sin_port = htons(port);
-    if (connect(comSocket,(struct sockaddr *) &server,sizeof(server)) < 0){
+    int errorCode = connect(comSocket,(struct sockaddr *) &server, sizeof(server));
+    if(errorCode < 0){
         //TODO add try again
-        ROS_ERROR("ERROR connecting to socket");
+        ROS_ERROR("ERROR connecting to socket, %i", errorCode);
         exit(0);
     }
 }
