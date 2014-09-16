@@ -22,6 +22,7 @@
 #include <cstdlib> // exit()
 #include <pthread.h>
 
+#include "Socket.h"
 #include "Camera.h"
 
 #ifdef __arm__
@@ -37,15 +38,16 @@ private:
     Camera camera;
     long time;
 
-    // TCP
-    static const int BUFFER = 1024;
     static const int WIDTH = 640;
     static const int HEIGHT = 480;
-    bool max_;
-    char comBuffer[BUFFER];
-    struct sockaddr_in ClientAddress;
-    int comSocket;  
-    int socketFileDescriptor; 
+
+    struct sockaddr_in clientAddressTCP;
+    int comSocketTCP;  
+    int socketFileDescriptorTCP; 
+
+    struct sockaddr_in ClientAddressUDP;
+    int comSocketUDP;  
+    int socketFileDescriptorUDP; 
 
     // Threading
     pthread_t imgGathering;
@@ -61,7 +63,7 @@ private:
 
     void* loopRecording();
 
-    void configServerParameter(int port);
+    void configServerParameter(int portTCP, int portUDP);
     void waitingForClient();
     void waitingForCommandFromClient();
     void sendProto(dotCapture::Img* message);

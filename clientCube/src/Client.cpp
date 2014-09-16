@@ -10,7 +10,7 @@ using namespace std;
 Client::Client(): recording(false){
     image_transport::ImageTransport it(nh);
     
-    string address, cubeid;
+    string address;
     int port;
     ros::param::get("~address", address);
     ros::param::get("~port", port);
@@ -226,10 +226,8 @@ void* Client::receivingImgLoop(){
     dotCapture::Img message;
     int i = 0;
     int sizeLz4;
+    struct timeval current_sys_time;
 
-
-    //unsigned char** pngBuf = new unsigned char*();
-   // size_t pngSize;
 
     camera_info_manager::CameraInfoManager m(nh, "narrow_stereo", "package://client_cube/calibration.ini");
     sensor_msgs::CameraInfo ros_camInfo = m.getCameraInfo();
@@ -252,7 +250,7 @@ void* Client::receivingImgLoop(){
     while(recording){
         //printf("Receiving image...\n");
         int received = recvDelimProtobuf(comSocket, &buffer);
-        // printf("-");
+        gettimeofday(&current_sys_time, 0);
          
         //read varint delimited protobuf object in to buffer
         google::protobuf::io::ArrayInputStream arrayIn(buffer, received);
@@ -269,8 +267,15 @@ void* Client::receivingImgLoop(){
         data = (unsigned char*)(const void *)message.mutable_image()->c_str();
 
         sizeLz4 = LZ4_decompress_safe((char*)(void*)(data), (char*)(void*)(iz4BuffDecod), message.mutable_image()->size(), WIDTH * HEIGHT);
-        
-        ROS_INFO("#%i img  %do", i, (int)message.mutable_image()->size());
+
+        double delay = current_sys_time.tv_sec - message.timestamp() + (current_sys_time.tv_usec - message.timestamp_microsec())/1000000.f;
+        ROS_INFO("#%i img  %do Image: %dsec %dmicro delay: %fmicro",
+                 i,
+                 (int)message.mutable_image()->size(),
+                 message.timestamp(),
+                 message.timestamp_microsec(),
+                 delay);
+
         
         
         cvSetData(pImg, iz4BuffDecod, pImg->widthStep);
@@ -278,7 +283,8 @@ void* Client::receivingImgLoop(){
         cv_image.image = pImg;
         
         // ---------- TO CHANGE FOR THE ACTUAL TIME ON THE DEVICE!!! ---------
-        ros::Time time_on_device(message.timestamp(), message.timestamp_microsec());
+        //ros::Time time_on_device(message.timestamp(), message.timestamp_microsec());
+        ros::Time time_on_device(delay, 0);
         //cv_image.header.stamp = ros::Time::now();
         cv_image.header.stamp = time_on_device;
 

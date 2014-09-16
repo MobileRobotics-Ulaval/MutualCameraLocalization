@@ -10,15 +10,22 @@ namespace img_server
 LedsFinder::LedsFinder(int port, int threshold, float shutterTime, int brightness, int exposure, float gain):
                     camera(threshold, shutterTime, brightness, exposure, gain),
                     recording(false){
-	this->configServerParameter(port);
+	this->configServerParameter(port, port);
     printf("[SERVER] Start image server on port %i...\n", port);
 }
 
-void LedsFinder::configServerParameter(int port){
-    bzero((char *) &ClientAddress, sizeof(ClientAddress));
-    ClientAddress.sin_family = AF_INET;
-    ClientAddress.sin_addr.s_addr = INADDR_ANY;
-    ClientAddress.sin_port = htons(port);
+void LedsFinder::configServerParameter(int portTCP, int portUDP){
+    //TCP
+    bzero((char *) &clientAddressTCP, sizeof(clientAddressTCP));
+    clientAddressTCP.sin_family = AF_INET;
+    clientAddressTCP.sin_addr.s_addr = INADDR_ANY;
+    clientAddressTCP.sin_port = htons(portTCP);
+
+    //UDP
+   // bzero((char *) &clientAddressTCP, sizeof(clientAddressTCP));
+   // clientAddressTCP.sin_family = AF_INET;
+   // clientAddressTCP.sin_addr.s_addr = INADDR_ANY;
+    //clientAddressTCP.sin_port = htons(port);
 }
 
 /**
@@ -33,30 +40,29 @@ void LedsFinder::startServerLoop(){
 
 void LedsFinder::waitingForClient(){
     int opt = 1;
-    struct sockaddr_in clientAddress;
     socklen_t clientAdressLength;
     while(true){
         printf("\n\n[SERVER] Waiting for a client to connect\n");
         //Creation of the socket
-        this->socketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+        this->socketFileDescriptorTCP = socket(AF_INET, SOCK_STREAM, 0);
 
-        this->checkForErrorTCP(this->socketFileDescriptor, "ERROR opening socket");
+        this->checkForErrorTCP(this->socketFileDescriptorTCP, "ERROR opening socket");
         
-        int comErrorCode = bind(this->socketFileDescriptor, (struct sockaddr *) &ClientAddress, sizeof(ClientAddress));
+        int comErrorCode = bind(this->socketFileDescriptorTCP, (struct sockaddr *) &clientAddressTCP, sizeof(clientAddressTCP));
         if(comErrorCode != 0){
             this->checkForErrorTCP(comErrorCode, "ERROR on binding");
-            close(this->comSocket);
-            close(this->socketFileDescriptor);
+            close(this->comSocketTCP);
+            close(this->socketFileDescriptorTCP);
             printf("Retry binding in 5s... \n");
             sleep(5);
             continue;
         }
         
-        listen(socketFileDescriptor, 5);
+        listen(socketFileDescriptorTCP, 5);
         
-        clientAdressLength = (socklen_t) sizeof(clientAddress);
-        this->comSocket = accept(this->socketFileDescriptor, (struct sockaddr *) &clientAddress, &clientAdressLength);
-        this->checkForErrorTCP(this->comSocket, "ERROR on accept");
+        clientAdressLength = (socklen_t) sizeof(clientAddressTCP);
+        this->comSocketTCP = accept(this->socketFileDescriptorTCP, (struct sockaddr *) &clientAddressTCP, &clientAdressLength);
+        this->checkForErrorTCP(this->comSocketTCP, "ERROR on accept");
 
         printf("[SERVER] Client connected\n");
         return;
@@ -139,8 +145,8 @@ void LedsFinder::waitingForCommandFromClient(){
 
     }
 
-    close(this->comSocket);
-    close(this->socketFileDescriptor);
+    close(this->comSocketTCP);
+    close(this->socketFileDescriptorTCP);
 }
 
 
@@ -174,9 +180,9 @@ void* LedsFinder::loopRecording(){
         gettimeofday(&t1, 0);
 
         pthread_mutex_lock(&proprietyMux);
-        this->camera.takeRawPicture();
+        //this->camera.takeRawPicture();
         //IF YOU DONT HAVE A CAMERA
-        //this->camera.takeFakePicture(); 
+        this->camera.takeFakePicture(); 
 
         gettimeofday(&t2, 0);
 
@@ -193,7 +199,7 @@ void* LedsFinder::loopRecording(){
 
         i++;
         gettimeofday(&t5, 0);
-        sendProto(dataToProto(t5.tv_sec, t6.tv_sec, izBuff, sizeLz4));
+        sendProto(dataToProto(t5.tv_sec, t6.tv_usec, izBuff, sizeLz4));
 
         gettimeofday(&t6, 0);
 
@@ -267,7 +273,7 @@ dotCapture::Command*  LedsFinder::getCommand(){
 	dotCapture::Command* com = new dotCapture::Command();
     unsigned char *buffer;
 
-    int received = recvDelimProtobuf(comSocket, &buffer);
+    int received = recvDelimProtobuf(comSocketTCP, &buffer);
      
     //read varint delimited protobuf object in to buffer
     google::protobuf::io::ArrayInputStream arrayIn(buffer, received);
@@ -278,8 +284,8 @@ dotCapture::Command*  LedsFinder::getCommand(){
 
     free(buffer);
     
-    //close(comSocket);
-   // close(socketFileDescriptor);
+    //close(comSocketTCP);
+   // close(socketFileDescriptorTCP);
     return com;
 }
 
@@ -299,9 +305,7 @@ void LedsFinder::sendProto(dotCapture::Img* message){
 	 
 	//write protobuf ack to buffer
 	message->SerializeToCodedStream(&codedOut);
-	int c = send(comSocket, ackBuf, ackSize, 0);
-	if(c < 0)
-		printf("Error: Impossible d'envoyer");
+	send(comSocketTCP, ackBuf, ackSize, 0);
 	delete(ackBuf);
 }
 

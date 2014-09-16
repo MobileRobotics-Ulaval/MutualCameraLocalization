@@ -2,7 +2,7 @@ CC =g++
 #CC = arm-linux-gnueabihf-g++
 #CFLAGS = -std=c++11 
 CFLAGS = -pthread 
-CFLAGS += -O3 -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=hard -ftree-vectorize -ftree-vectorizer-verbose=3
+#CFLAGS += -O3 -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=hard -ftree-vectorize -ftree-vectorizer-verbose=3
 OUTPUTNAME = FlyCamServer${D} 
 INCLUDE =-I../include -I/../lib -I/usr/arm-linux-gnueabihf/lib  
 #Original de Olivier, mais marche pas sur ubuntu.
@@ -15,7 +15,7 @@ PROTODIR = proto
 PROTOBIN = protoc 
 #PROTOBIN = ../bin/protoc 
 
-OBJS = main.o LedsFinder.o Camera.o lodepng.o lz4.o
+OBJS = main.o LedsFinder.o Camera.o Socket.o lodepng.o lz4.o
 PROTOOBJS =${PROTODIR}/img.pb.o ${PROTODIR}/command.pb.o
 
 #===src===-lprotobuf

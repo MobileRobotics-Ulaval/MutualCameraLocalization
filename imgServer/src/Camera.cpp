@@ -20,11 +20,12 @@ void Camera::takeRawPicture(){
 void Camera::takeFakePicture(){
     img = (unsigned char*)malloc(WIDTH * HEIGHT);
     imgSize = (WIDTH * HEIGHT);
-    zig ++;
-    if(zig >= 5) zig =1;
+    if(zig > 255) zig = 0;
+    printf("color: %i\n", zig);
     for(int i = 0; i < imgSize; i++){
-        img[i] = (i % WIDTH)  % zig == 0 ? 255 : 0;
+        img[i] = i < WIDTH * HEIGHT * 0.5 ? zig : i%255;
     }
+    zig++;
 }
 /**
     Pass a raw image throught a threshold
@@ -49,7 +50,7 @@ int Camera::initCamera(){
     if(busMgr.GetCameraFromIndex(0, &guid) != FlyCapture2::PGRERROR_OK){
       printf("No camera connected.\n");
       //exit(0);
-      return -1;
+      //return -1;
     }
     this->printErrorCam(cam.Connect(&guid));
     this->configureProperties();
