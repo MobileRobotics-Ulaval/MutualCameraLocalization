@@ -41,13 +41,7 @@ private:
     static const int WIDTH = 640;
     static const int HEIGHT = 480;
 
-    struct sockaddr_in clientAddressTCP;
-    int comSocketTCP;  
-    int socketFileDescriptorTCP; 
-
-    struct sockaddr_in ClientAddressUDP;
-    int comSocketUDP;  
-    int socketFileDescriptorUDP; 
+    SocketTCP serverTCP;
 
     // Threading
     pthread_t imgGathering;
@@ -67,7 +61,7 @@ private:
     void waitingForClient();
     void waitingForCommandFromClient();
     void sendProto(dotCapture::Img* message);
-
+    int recvDelimProtobuf(unsigned char **buffer);
 public:
     LedsFinder(int port, int threshold, float shutter, int brightness, int exposure, float gain);
     ~LedsFinder();

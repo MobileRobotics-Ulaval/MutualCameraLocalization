@@ -10,23 +10,10 @@ namespace img_server
 LedsFinder::LedsFinder(int port, int threshold, float shutterTime, int brightness, int exposure, float gain):
                     camera(threshold, shutterTime, brightness, exposure, gain),
                     recording(false){
-	this->configServerParameter(port, port);
+    this->serverTCP.init(port);
     printf("[SERVER] Start image server on port %i...\n", port);
 }
 
-void LedsFinder::configServerParameter(int portTCP, int portUDP){
-    //TCP
-    bzero((char *) &clientAddressTCP, sizeof(clientAddressTCP));
-    clientAddressTCP.sin_family = AF_INET;
-    clientAddressTCP.sin_addr.s_addr = INADDR_ANY;
-    clientAddressTCP.sin_port = htons(portTCP);
-
-    //UDP
-   // bzero((char *) &clientAddressTCP, sizeof(clientAddressTCP));
-   // clientAddressTCP.sin_family = AF_INET;
-   // clientAddressTCP.sin_addr.s_addr = INADDR_ANY;
-    //clientAddressTCP.sin_port = htons(port);
-}
 
 /**
     Main Server loop
@@ -39,33 +26,19 @@ void LedsFinder::startServerLoop(){
 }
 
 void LedsFinder::waitingForClient(){
-    int opt = 1;
-    socklen_t clientAdressLength;
     while(true){
         printf("\n\n[SERVER] Waiting for a client to connect\n");
-        //Creation of the socket
-        this->socketFileDescriptorTCP = socket(AF_INET, SOCK_STREAM, 0);
+        this->serverTCP.connect();
 
-        this->checkForErrorTCP(this->socketFileDescriptorTCP, "ERROR opening socket");
-        
-        int comErrorCode = bind(this->socketFileDescriptorTCP, (struct sockaddr *) &clientAddressTCP, sizeof(clientAddressTCP));
-        if(comErrorCode != 0){
-            this->checkForErrorTCP(comErrorCode, "ERROR on binding");
-            close(this->comSocketTCP);
-            close(this->socketFileDescriptorTCP);
+        if(!this->serverTCP.bindAndAccept()){
             printf("Retry binding in 5s... \n");
             sleep(5);
             continue;
         }
-        
-        listen(socketFileDescriptorTCP, 5);
-        
-        clientAdressLength = (socklen_t) sizeof(clientAddressTCP);
-        this->comSocketTCP = accept(this->socketFileDescriptorTCP, (struct sockaddr *) &clientAddressTCP, &clientAdressLength);
-        this->checkForErrorTCP(this->comSocketTCP, "ERROR on accept");
-
-        printf("[SERVER] Client connected\n");
-        return;
+        else{
+            printf("[SERVER] Client connected\n");
+            return;;
+        }
     }
 }
 
@@ -145,8 +118,7 @@ void LedsFinder::waitingForCommandFromClient(){
 
     }
 
-    close(this->comSocketTCP);
-    close(this->socketFileDescriptorTCP);
+    this->serverTCP.disconnect();
 }
 
 
@@ -180,9 +152,9 @@ void* LedsFinder::loopRecording(){
         gettimeofday(&t1, 0);
 
         pthread_mutex_lock(&proprietyMux);
-        //this->camera.takeRawPicture();
+        this->camera.takeRawPicture();
         //IF YOU DONT HAVE A CAMERA
-        this->camera.takeFakePicture(); 
+        //this->camera.takeFakePicture(); 
 
         gettimeofday(&t2, 0);
 
@@ -229,12 +201,12 @@ dotCapture::Img* LedsFinder::dataToProto(long timestamp, int timestamp_microsec,
    reads a varint delimited protocol buffers message from a TCP socket
    returns message in buffer, and returns number of bytes read (not including delimiter)
 */
-int recvDelimProtobuf(int sock, unsigned char **buffer){
+int LedsFinder::recvDelimProtobuf(unsigned char **buffer){
     //read the delimiting varint byte by byte
     unsigned int length=0;
     int recv_bytes=0;
     char bite;
-    int received=recv(sock, &bite, 1, 0);
+    int received=this->serverTCP.toReceive(&bite, 1, 0);
     if(received<0)
         return received;
     else
@@ -242,7 +214,7 @@ int recvDelimProtobuf(int sock, unsigned char **buffer){
     length = (bite & 0x7f);
     while(bite & 0x80){
         memset(&bite, 0, 1);
-        received=recv(sock, &bite, 1, 0);
+        received=serverTCP.toReceive(&bite, 1, 0);
         if(received<0)
             return received;
         else
@@ -254,7 +226,7 @@ int recvDelimProtobuf(int sock, unsigned char **buffer){
     recv_bytes=0;
     *buffer=(unsigned char *)malloc(sizeof(unsigned char) * length);
     while(recv_bytes < length){
-        received=recv(sock, *buffer + (sizeof(unsigned char) * recv_bytes), length-recv_bytes, 0);
+        received=serverTCP.toReceive((char *)(*buffer + (sizeof(unsigned char) * recv_bytes)), length-recv_bytes, 0);
         if(received<0)
             return received;
         else
@@ -273,7 +245,7 @@ dotCapture::Command*  LedsFinder::getCommand(){
 	dotCapture::Command* com = new dotCapture::Command();
     unsigned char *buffer;
 
-    int received = recvDelimProtobuf(comSocketTCP, &buffer);
+    int received = recvDelimProtobuf(&buffer);
      
     //read varint delimited protobuf object in to buffer
     google::protobuf::io::ArrayInputStream arrayIn(buffer, received);
@@ -305,7 +277,7 @@ void LedsFinder::sendProto(dotCapture::Img* message){
 	 
 	//write protobuf ack to buffer
 	message->SerializeToCodedStream(&codedOut);
-	send(comSocketTCP, ackBuf, ackSize, 0);
+	serverTCP.toSend(ackBuf, ackSize, 0);
 	delete(ackBuf);
 }
 
@@ -317,12 +289,6 @@ long LedsFinder::getTimeInMilliseconds()
     // The + 0.5 rounds the milliseconds value
     return (t.tv_sec*1000 + t.tv_nsec/1.0e6) + 0.5;
 }
-
-void LedsFinder::checkForErrorTCP(int errorCode, const char* errorMessage){
-    if (errorCode < 0) 
-    	perror(errorMessage);
-}
-
 
 LedsFinder::~LedsFinder(){
     //close(sClient);

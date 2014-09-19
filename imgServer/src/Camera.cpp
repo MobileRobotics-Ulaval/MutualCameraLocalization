@@ -6,6 +6,9 @@ namespace img_server
 {
 Camera::Camera(int threshold, float shutterTime, int brightness, int exposure, float gain):
     threshold(threshold), shutter(shutterTime), brightness(brightness), exposure(exposure), gain(gain){
+        
+    img = (unsigned char*)malloc(WIDTH * HEIGHT);
+    imgSize = (WIDTH * HEIGHT);
 }
 
 void Camera::takeRawPicture(){
@@ -18,8 +21,6 @@ void Camera::takeRawPicture(){
 }
 
 void Camera::takeFakePicture(){
-    img = (unsigned char*)malloc(WIDTH * HEIGHT);
-    imgSize = (WIDTH * HEIGHT);
     if(zig > 255) zig = 0;
     printf("color: %i\n", zig);
     for(int i = 0; i < imgSize; i++){
@@ -113,10 +114,10 @@ void Camera::stopRecording()
    Convert a char array to PNG
 */
 void Camera::compressToPNG(unsigned char**& pngBuf, size_t* pngSize, const unsigned char *imgBuf, const int w, const int h){
-    int error = lodepng_encode_memory(pngBuf, pngSize, imgBuf, w, h, LCT_GREY,  8);
+    int error = 1;//lodepng_encode_memory(pngBuf, pngSize, imgBuf, w, h, LCT_GREY,  8);
 
     if(error){
-        printf("Error %u: %s\n", error, lodepng_error_text(error));
+        //printf("Error %u: %s\n", error, lodepng_error_text(error));
         exit(0);
     }
     printf("Compression success!!\npng=%.3fko raw=%.3fko\n", (float)*pngSize/1000.f, (float)(w*h)/1000.f);
@@ -126,7 +127,7 @@ void Camera::compressToPNG(unsigned char**& pngBuf, size_t* pngSize, const unsig
    Save a PNG in memory to a file
 */
 void Camera::saveFilePNG(unsigned char* pngBuf, size_t pngSize, string filename){
-    lodepng_save_file(pngBuf, pngSize, filename.c_str());
+    //lodepng_save_file(pngBuf, pngSize, filename.c_str());
 }
 
 /*

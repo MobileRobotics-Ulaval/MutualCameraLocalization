@@ -227,6 +227,8 @@ void* Client::receivingImgLoop(){
     int i = 0;
     int sizeLz4;
     struct timeval current_sys_time;
+    struct timeval t1, t2;
+    double elapsedTime;
 
 
     camera_info_manager::CameraInfoManager m(nh, "narrow_stereo", "package://client_cube/calibration.ini");
@@ -268,6 +270,8 @@ void* Client::receivingImgLoop(){
 
         sizeLz4 = LZ4_decompress_safe((char*)(void*)(data), (char*)(void*)(iz4BuffDecod), message.mutable_image()->size(), WIDTH * HEIGHT);
 
+
+        gettimeofday(&t2, NULL);
         double delay = current_sys_time.tv_sec - message.timestamp() + (current_sys_time.tv_usec - message.timestamp_microsec())/1000000.f;
         ROS_INFO("#%i img  %do Image: %dsec %dmicro delay: %fmicro",
                  i,
@@ -275,6 +279,10 @@ void* Client::receivingImgLoop(){
                  message.timestamp(),
                  message.timestamp_microsec(),
                  delay);
+        elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
+        elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
+        cout << elapsedTime << " ms.\n";
+        gettimeofday(&t1, NULL);
 
         
         
@@ -305,6 +313,7 @@ void* Client::receivingImgLoop(){
 /**
     Debugging fonction, send a image from a PNG file
 */
+/**
 void Client::foo(){
     unsigned char *buffer;
     unsigned char* data;
@@ -362,7 +371,7 @@ void Client::foo(){
     free(pngBuf);
     ROS_INFO("Images total =%i", i);
 }
-
+*/
 
 
 /*

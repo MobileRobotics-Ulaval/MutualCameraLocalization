@@ -15,7 +15,7 @@ PROTODIR = proto
 PROTOBIN = protoc 
 #PROTOBIN = ../bin/protoc 
 
-OBJS = main.o LedsFinder.o Camera.o Socket.o lodepng.o lz4.o
+OBJS = main.o LedsFinder.o Camera.o Socket.o lz4.o
 PROTOOBJS =${PROTODIR}/img.pb.o ${PROTODIR}/command.pb.o
 
 #===src===-lprotobuf
