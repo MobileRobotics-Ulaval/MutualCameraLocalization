@@ -35,23 +35,22 @@
 #include "proto/img.pb.h"
 #include "proto/command.pb.h"
 
+
+#include "Socket.h"
+
 class Client
 {
 private:
-    static const int EXIT_CODE = 42;
-    static const int NO_ERROR = 0;
 
     int WIDTH; //640
     int HEIGHT; //480
 
-    // TCP
-    static const int BUFFER = 1024;
-    char szBuffer[BUFFER];
-    struct sockaddr_in server;
-    int comSocket;
+    unsigned char bigBuffer[307200];
 
-    //struct hostent *host;
-    
+    SocketTCP clientTCP;
+    SocketUDP clientUDP;
+
+    dotCapture::Img recvDelimProtobuf(unsigned char *buffer);
 
     // Threading
     pthread_mutex_t recordingMux; 

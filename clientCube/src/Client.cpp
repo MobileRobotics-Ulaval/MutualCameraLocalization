@@ -11,12 +11,14 @@ Client::Client(): recording(false){
     image_transport::ImageTransport it(nh);
     
     string address;
-    int port;
+    int portTCP, portUDP;
     ros::param::get("~address", address);
-    ros::param::get("~port", port);
+    ros::param::get("~portTCP", portTCP);
+    ros::param::get("~portUDP", portUDP);
 
     ROS_INFO("Addresse: %s", address.c_str());
-    ROS_INFO("port: %i", port);
+    ROS_INFO("portTCP: %i", portTCP);
+    ROS_INFO("portUDP: %i", portUDP);
 
     pub = it.advertiseCamera("/camera/image_raw", 1);
     //pub = it.advertiseCamera("/camera/image_raw", 1);
@@ -25,24 +27,8 @@ Client::Client(): recording(false){
     //    printf("Not ok");
     //}
 
-	comSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (comSocket < 0) 
-        ROS_ERROR("ERROR opening socket");
-        
-   struct hostent *host = gethostbyname(address.c_str());
-    if (host == NULL) 
-        ROS_ERROR("ERROR, no such host");
-        
-    bzero((char *) &server, sizeof(server));
-    server.sin_family = AF_INET;
-    bcopy((char *)host->h_addr, (char *)&server.sin_addr.s_addr, host->h_length);
-    server.sin_port = htons(port);
-    int errorCode = connect(comSocket,(struct sockaddr *) &server, sizeof(server));
-    if(errorCode < 0){
-        //TODO add try again
-        ROS_ERROR("ERROR connecting to socket, %i", errorCode);
-        exit(0);
-    }
+    clientTCP.init(address, portTCP);
+    clientUDP.init(address, portUDP);
 }
 
 
@@ -145,7 +131,8 @@ int Client::startListeningLoop(){
     }while(flag);
     ROS_INFO("End of program");
 
-    close(comSocket);
+    clientTCP.disconnect();
+    clientUDP.disconnect();
 
     return 0; 
 }
@@ -167,7 +154,7 @@ int Client::sendCommand(dotCapture::Command &com){
      
     //write protobuf ack to buffer
     com.SerializeToCodedStream(&codedOut);
-    int c = send(comSocket, ackBuf, ackSize, 0);
+    int c = clientTCP.toSend(ackBuf, ackSize, 0);
     if(c < 0){
         ROS_ERROR("Error: Impossible to send packet");
     }
@@ -178,41 +165,64 @@ int Client::sendCommand(dotCapture::Command &com){
    Reads a varint delimited protocol buffers message from a TCP socket
    returns message in buffer, and returns number of bytes read (not including delimiter)
 */
-int recvDelimProtobuf(int sock, unsigned char **buffer){
+dotCapture::Img  Client::recvDelimProtobuf(unsigned char *buffer){
+    dotCapture::Img msg;
     //read the delimiting varint byte by byte
-    unsigned int length=0;
-    int recv_bytes=0;
-    char bite;
-    int received = recv(sock, &bite, 1, 0);
-    if(received < 0)
-        return received;
-    else
-        recv_bytes += received;
-    length = (bite & 0x7f);
-    while(bite & 0x80){
-        memset(&bite, 0, 1);
-        received=recv(sock, &bite, 1, 0);
-        if(received<0)
-            return received;
-        else
-            recv_bytes += received;
-        length|= (bite & 0x7F) << (7*(recv_bytes-1));
-    }
- 
-    //receive remainder of message
-    recv_bytes=0;
-    *buffer=(unsigned char *)malloc(sizeof(unsigned char) * length);
-    while(recv_bytes < length){
-        received=recv(sock, *buffer + (sizeof(unsigned char) * recv_bytes), length-recv_bytes, 0);
-        if(received<0)
-            return received;
-        else
-            recv_bytes+=received;
-    }
+    int size = this->clientUDP.toReceive((char*)buffer, 307200, 0);
+    ROS_INFO("length %i", size);
 
-  //  if(recv_bytes >= length)
-  //      printf("Bytes receive excess (%i) = (%x)\n length(%i)\n", recv_bytes, recv_bytes, length);
-    return recv_bytes;
+    google::protobuf::io::ArrayInputStream arr(buffer, size);
+    google::protobuf::io::CodedInputStream input(&arr);
+
+    uint32_t message1_size = 0;
+    input.ReadVarint32(&message1_size);
+    google::protobuf::io::CodedInputStream::Limit limit = input.PushLimit(message1_size);
+    if(!msg.ParseFromCodedStream(&input)){
+        ROS_ERROR("Can't parse img");
+        exit(0);
+    }
+    input.PopLimit(limit);
+    return msg;
+
+//    UINT32 message2_size = 0;
+//    input.ReadVarint32(&message2_size);
+//    limit = input.PushLimit(message2_size);
+//    msg2.ParseFromCodedStream(&input);
+//    input.PopLimit(limit);
+
+//    unsigned int length=0;
+//    int recv_bytes=0;
+//    char bite;
+//    int received = this->clientUDP.toReceive(&bite, 1, 0);
+//    if(received<0){
+//        ROS_INFO("No reception :_(");
+//        return received;
+//    }
+//    else
+//        recv_bytes += received;
+//    length = (bite & 0x7f);
+//    while(bite & 0x80){
+//        ROS_INFO("length:%i", length);
+//        memset(&bite, 0, 1);
+//        received = clientUDP.toReceive(&bite, 1, 0);
+//        if(received<0)
+//            return received;
+//        else
+//            recv_bytes += received;
+//        length|= (bite & 0x7F) << (7*(recv_bytes-1));
+//    }
+
+//    //receive remainder of message
+//    recv_bytes=0;
+//    *buffer=(unsigned char *)malloc(sizeof(unsigned char) * length);
+//    while(recv_bytes < length){
+//        received = clientUDP.toReceive((char *)(*buffer + (sizeof(unsigned char) * recv_bytes)), length-recv_bytes, 0);
+//        if(received<0)
+//            return received;
+//        else
+//            recv_bytes+=received;
+//    }
+//    return recv_bytes;
 }
 
 /*
@@ -249,20 +259,26 @@ void* Client::receivingImgLoop(){
 
     ros::Rate loop_rate(30);
     printf("Start recording!!!\n");
+
+
+    //Init UDP by sending a bit
+    clientUDP.toSend((char *)iz4BuffDecod, 1, 0);
+
     while(recording){
-        //printf("Receiving image...\n");
-        int received = recvDelimProtobuf(comSocket, &buffer);
+        //printf("Receiving image...\n");bigBuffer
+        //int received = recvDelimProtobuf(&buffer); good old buffer
+        message = recvDelimProtobuf((unsigned char *)bigBuffer);
         gettimeofday(&current_sys_time, 0);
          
         //read varint delimited protobuf object in to buffer
-        google::protobuf::io::ArrayInputStream arrayIn(buffer, received);
-        google::protobuf::io::CodedInputStream codedIn(&arrayIn);
-        google::protobuf::io::CodedInputStream::Limit msgLimit = codedIn.PushLimit(received);
-        if(!message.ParseFromCodedStream(&codedIn)){
-            ROS_ERROR("Can't parse img");
-            exit(0);
-        }
-        codedIn.PopLimit(msgLimit);
+//        google::protobuf::io::ArrayInputStream arrayIn(buffer, received);
+//        google::protobuf::io::CodedInputStream codedIn(&arrayIn);
+//        google::protobuf::io::CodedInputStream::Limit msgLimit = codedIn.PushLimit(received);
+//        if(!message.ParseFromCodedStream(&codedIn)){
+//            ROS_ERROR("Can't parse img");
+//            exit(0);
+//        }
+//        codedIn.PopLimit(msgLimit);
 
 
         //printf("Timestamp: %i\n Micro: %i\n", message.timestamp(), message.timestamp_microsec());

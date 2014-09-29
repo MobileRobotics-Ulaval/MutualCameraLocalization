@@ -9,7 +9,7 @@ int main(int argc, char* argv[]){
 	float gain = 0.1f;
 
 
-	img_server::LedsFinder ledsFinder(5005, threshold, shutter, brightness, exposure, gain);
+	img_server::LedsFinder ledsFinder(5005, 32053, threshold, shutter, brightness, exposure, gain);
 	//ledsFinder.takeRawPicture(1,threshold);
 	ledsFinder.startServerLoop();
 	return 0;

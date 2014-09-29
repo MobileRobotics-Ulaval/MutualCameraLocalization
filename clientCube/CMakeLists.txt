@@ -123,6 +123,7 @@ include_directories(
 add_executable( client_cube
     src/main.cpp
     src/Client.cpp
+    src/Socket.cpp
     src/lz4.c
     src/lodepng.cpp
     src/proto/img.pb.cc

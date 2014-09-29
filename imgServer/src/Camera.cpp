@@ -9,6 +9,29 @@ Camera::Camera(int threshold, float shutterTime, int brightness, int exposure, f
         
     img = (unsigned char*)malloc(WIDTH * HEIGHT);
     imgSize = (WIDTH * HEIGHT);
+    zig = 0;
+}
+
+
+/*
+   Initiate the camera's parameter
+*/
+int Camera::initCamera(){
+    FlyCapture2::BusManager busMgr;
+    FlyCapture2::PGRGuid guid;
+    if(busMgr.GetCameraFromIndex(0, &guid) != FlyCapture2::PGRERROR_OK){
+      printf("No camera connected.\n");
+      //exit(0);
+      //return -1;
+    }
+    this->printErrorCam(cam.Connect(&guid));
+    this->configureProperties();
+    this->printErrorCam(cam.StartCapture());
+    
+    // Sometimes, the first image is invalid. This way, we get rid of it.
+    FlyCapture2::Image rawImage;
+    this->printErrorCam(cam.RetrieveBuffer( &rawImage ));
+    return 0;
 }
 
 void Camera::takeRawPicture(){
@@ -39,28 +62,6 @@ void Camera::doThreshold(){
         if(p[i] < t)
             p[i] = 0;
     }
-}
-
-
-/*
-   Initiate the camera's parameter
-*/
-int Camera::initCamera(){
-    FlyCapture2::BusManager busMgr;
-    FlyCapture2::PGRGuid guid;
-    if(busMgr.GetCameraFromIndex(0, &guid) != FlyCapture2::PGRERROR_OK){
-      printf("No camera connected.\n");
-      //exit(0);
-      //return -1;
-    }
-    this->printErrorCam(cam.Connect(&guid));
-    this->configureProperties();
-    this->printErrorCam(cam.StartCapture());
-    
-    // Sometimes, the first image is invalid. This way, we get rid of it.
-    FlyCapture2::Image rawImage;
-    this->printErrorCam(cam.RetrieveBuffer( &rawImage ));
-    return 0;
 }
 
 /*

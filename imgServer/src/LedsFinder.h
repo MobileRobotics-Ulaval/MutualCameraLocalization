@@ -40,8 +40,10 @@ private:
 
     static const int WIDTH = 640;
     static const int HEIGHT = 480;
+    unsigned char bigBuffer[307200];
 
     SocketTCP serverTCP;
+    SocketUDP serverUDP;
 
     // Threading
     pthread_t imgGathering;
@@ -57,13 +59,12 @@ private:
 
     void* loopRecording();
 
-    void configServerParameter(int portTCP, int portUDP);
     void waitingForClient();
     void waitingForCommandFromClient();
     void sendProto(dotCapture::Img* message);
     int recvDelimProtobuf(unsigned char **buffer);
 public:
-    LedsFinder(int port, int threshold, float shutter, int brightness, int exposure, float gain);
+    LedsFinder(int portTCP, int portUDP, int threshold, float shutter, int brightness, int exposure, float gain);
     ~LedsFinder();
     void startServerLoop();
 };

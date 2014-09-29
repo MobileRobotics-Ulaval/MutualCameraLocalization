@@ -7,11 +7,13 @@ namespace img_server
 /**
     Initiation of the server
 */
-LedsFinder::LedsFinder(int port, int threshold, float shutterTime, int brightness, int exposure, float gain):
+LedsFinder::LedsFinder(int portTCP, int portUDP, int threshold, float shutterTime, int brightness, int exposure, float gain):
                     camera(threshold, shutterTime, brightness, exposure, gain),
                     recording(false){
-    this->serverTCP.init(port);
-    printf("[SERVER] Start image server on port %i...\n", port);
+    this->serverTCP.init(portTCP);
+    this->serverUDP.init(portUDP);
+    //serverUDP.connect();
+    printf("[SERVER] Start image server on port TCP: %i port UDP: %i...\n", portTCP, portUDP);
 }
 
 
@@ -119,6 +121,7 @@ void LedsFinder::waitingForCommandFromClient(){
     }
 
     this->serverTCP.disconnect();
+    serverUDP.disconnect();
 }
 
 
@@ -142,19 +145,23 @@ void* LedsFinder::loopRecording(){
     
     // If the camera is not connected, the thread is stop
 
-    while(this->camera.initCamera() != 0){
-        printf("Waiting 5s and trying again...\n");
-        sleep(5);
-    }
+   // while(this->camera.initCamera() != 0){
+   //     printf("Waiting 5s and trying again...\n");
+   //     sleep(5);
+   // }
+
+    //Init the UDP connection by waiting on the client:
+    serverUDP.bindAndAccept();
+    serverUDP.toReceive((char * )izBuff, 1, 0);
 
     gettimeofday(&t6, 0);
     while(recording){
         gettimeofday(&t1, 0);
 
         pthread_mutex_lock(&proprietyMux);
-        this->camera.takeRawPicture();
+        //this->camera.takeRawPicture();
         //IF YOU DONT HAVE A CAMERA
-        //this->camera.takeFakePicture(); 
+        this->camera.takeFakePicture(); 
 
         gettimeofday(&t2, 0);
 
@@ -181,6 +188,7 @@ void* LedsFinder::loopRecording(){
     }
     printf("[THREAD] Images total =%i\n", i);
     this->camera.stopRecording();
+
 }
 
 
@@ -266,19 +274,28 @@ dotCapture::Command*  LedsFinder::getCommand(){
    Send Image protobuf to the client
 */
 void LedsFinder::sendProto(dotCapture::Img* message){
-	int varintsize = ::google::protobuf::io::CodedOutputStream::VarintSize32(message->ByteSize());
-	int ackSize = message->ByteSize() + varintsize;
-	char* ackBuf = new char[ackSize];
+    google::protobuf::io::ArrayOutputStream arr(bigBuffer, sizeof(bigBuffer));
+    google::protobuf::io::CodedOutputStream output(&arr);
+                 
+    output.WriteVarint32(message->ByteSize());
+    message->SerializeToCodedStream(&output);
+     
+    // repeat if more messages can fit into the buffer
+     
+    int nSent = this->serverUDP.toSend( (char*)bigBuffer, output.ByteCount(), 0);
+	// int varintsize = ::google::protobuf::io::CodedOutputStream::VarintSize32(message->ByteSize());
+	// int ackSize = message->ByteSize() + varintsize;
+	// char* ackBuf = new char[ackSize];
 	 
-	//write varint delimiter to buffer
-	::google::protobuf::io::ArrayOutputStream arrayOut(ackBuf, ackSize);
-	::google::protobuf::io::CodedOutputStream codedOut(&arrayOut);
-	codedOut.WriteVarint32(message->ByteSize());
+	// //write varint delimiter to buffer
+	// ::google::protobuf::io::ArrayOutputStream arrayOut(ackBuf, ackSize);
+	// ::google::protobuf::io::CodedOutputStream codedOut(&arrayOut);
+	// codedOut.WriteVarint32(message->ByteSize());
 	 
-	//write protobuf ack to buffer
-	message->SerializeToCodedStream(&codedOut);
-	serverTCP.toSend(ackBuf, ackSize, 0);
-	delete(ackBuf);
+	// //write protobuf ack to buffer
+	// message->SerializeToCodedStream(&codedOut);
+	// serverUDP.toSend(ackBuf, ackSize, 0);
+	// delete(ackBuf);
 }
 
 

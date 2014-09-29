@@ -2,6 +2,7 @@
 #ifndef _SOCKETS_H_
 #define _SOCKETS_H_
 
+#include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -16,10 +17,6 @@ namespace img_server
 {
 class Socket
 {
-protected:
-    struct sockaddr_in clientAddress;
-    int comSocket;  
-    int socketFileDescriptor; 
 public:
 	void init(int port);
 	void connect();
@@ -27,6 +24,10 @@ public:
 	ssize_t toReceive(char * byte, size_t size, int flag);
 	void disconnect();
 	void checkForError(int errorCode, const char* errorMessage);
+protected:
+    struct sockaddr_in serverSock;
+    int comSocket;  
+    int socketFileDescriptor; 
 };
 
 
@@ -42,9 +43,14 @@ public:
 class SocketUDP: public Socket
 {
 public:
+	void init(int port);
 	void connect();
+	bool bindAndAccept();
 	ssize_t toSend(const char * byte, size_t size, int flag);
 	ssize_t toReceive(char * byte, size_t size, int flag);
+private:
+	struct sockaddr_in clientSock;
+	socklen_t clientSockLen;
 };
 
 }
