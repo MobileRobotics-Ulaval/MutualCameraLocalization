@@ -44,10 +44,12 @@ void Camera::takeRawPicture(){
 }
 
 void Camera::takeFakePicture(){
-    if(zig > 255) zig = 0;
-    printf("color: %i\n", zig);
-    for(int i = 0; i < imgSize; i++){
-        img[i] = i < WIDTH * HEIGHT * 0.5 ? zig : i%255;
+    if(zig > 100){ 
+        zig = 0;
+        printf("color: %i\n", zig);
+        for(int i = 0; i < imgSize; i++){
+            img[i] = i < WIDTH * HEIGHT * 0.5 ? zig : i%255;
+        }
     }
     zig++;
 }
