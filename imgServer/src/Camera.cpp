@@ -22,7 +22,7 @@ int Camera::initCamera(){
     if(busMgr.GetCameraFromIndex(0, &guid) != FlyCapture2::PGRERROR_OK){
       printf("No camera connected.\n");
       //exit(0);
-      //return -1;
+      return -1;
     }
     this->printErrorCam(cam.Connect(&guid));
     this->configureProperties();
@@ -31,6 +31,8 @@ int Camera::initCamera(){
     // Sometimes, the first image is invalid. This way, we get rid of it.
     FlyCapture2::Image rawImage;
     this->printErrorCam(cam.RetrieveBuffer( &rawImage ));
+
+    printf("Camera detected.\n");
     return 0;
 }
 
@@ -58,6 +60,8 @@ void Camera::takeFakePicture(){
 */
 void Camera::doThreshold(){
     int t = this->threshold;
+    if(t == 0)
+        return;
     unsigned char* p = this->img;
     unsigned int size = this->imgSize;
     for(int i = 0; i < size; i++){

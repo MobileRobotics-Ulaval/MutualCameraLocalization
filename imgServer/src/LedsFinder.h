@@ -34,6 +34,10 @@ namespace img_server
 {
 class LedsFinder
 {
+public:
+    LedsFinder(int portTCP, int portUDP, int threshold, float shutter, int brightness, int exposure, float gain, bool isTcp);
+    ~LedsFinder();
+    void startServerLoop();
 private:
     Camera camera;
     long time;
@@ -43,7 +47,8 @@ private:
     unsigned char bigBuffer[307200];
 
     SocketTCP serverTCP;
-    SocketUDP serverUDP;
+    Socket * serverUDP;
+    bool isTcp;
 
     // Threading
     pthread_t imgGathering;
@@ -63,10 +68,6 @@ private:
     void waitingForCommandFromClient();
     void sendProto(dotCapture::Img* message);
     int recvDelimProtobuf(unsigned char **buffer);
-public:
-    LedsFinder(int portTCP, int portUDP, int threshold, float shutter, int brightness, int exposure, float gain);
-    ~LedsFinder();
-    void startServerLoop();
 };
 }
 #endif

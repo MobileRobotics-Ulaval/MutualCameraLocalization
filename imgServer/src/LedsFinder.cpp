@@ -7,11 +7,21 @@ namespace img_server
 /**
     Initiation of the server
 */
-LedsFinder::LedsFinder(int portTCP, int portUDP, int threshold, float shutterTime, int brightness, int exposure, float gain):
+LedsFinder::LedsFinder(int portTCP, int portUDP, int threshold, float shutterTime, int brightness, int exposure, float gain, bool pIsTcp):
                     camera(threshold, shutterTime, brightness, exposure, gain),
-                    recording(false){
+                    recording(false), 
+                    isTcp(pIsTcp){
+
     this->serverTCP.init(portTCP);
-    this->serverUDP.init(portUDP);
+    if(isTcp){
+        printf("Mode TCP\n");
+        this->serverUDP = new SocketTCP;
+    }
+    else
+        printf("Mode UDP\n");
+        this->serverUDP = new SocketUDP;
+    }
+    this->serverUDP->init(portUDP);
     //serverUDP.connect();
     printf("[SERVER] Start image server on port TCP: %i port UDP: %i...\n", portTCP, portUDP);
 }
@@ -145,23 +155,31 @@ void* LedsFinder::loopRecording(){
     
     // If the camera is not connected, the thread is stop
 
-   // while(this->camera.initCamera() != 0){
-   //     printf("Waiting 5s and trying again...\n");
-   //     sleep(5);
-   // }
+   while(this->camera.initCamera() != 0){
+       printf("Waiting 5s and trying again...\n");
+       sleep(5);
+   }
 
     //Init the UDP connection by waiting on the client:
-    serverUDP.bindAndAccept();
-    serverUDP.toReceive((char * )izBuff, 1, 0);
+   if(isTCP){
+        serverUDP.connect();
+        serverUDP.bindAndAccept();
+   }
+   else{
+        serverUDP.bindAndAccept();
+        serverUDP.toReceive((char * )izBuff, 100, 0);
+   }
+
 
     gettimeofday(&t6, 0);
     while(recording){
         gettimeofday(&t1, 0);
 
         pthread_mutex_lock(&proprietyMux);
-        //this->camera.takeRawPicture();
+
+        this->camera.takeRawPicture();
         //IF YOU DONT HAVE A CAMERA
-        this->camera.takeFakePicture(); 
+        //this->camera.takeFakePicture(); 
 
         gettimeofday(&t2, 0);
 

@@ -20,7 +20,7 @@ Client::Client(): recording(false){
     ROS_INFO("portTCP: %i", portTCP);
     ROS_INFO("portUDP: %i", portUDP);
 
-    pub = it.advertiseCamera("/camera/image_raw", 1);
+    pub = it.advertiseCamera("camera/image_raw", 1);
     //pub = it.advertiseCamera("/camera/image_raw", 1);
     //pub = nh.advertise<sensor_msgs::Image>("/cube_feed_topic", 1);
     //if(!nh.ok()){
@@ -183,46 +183,6 @@ dotCapture::Img  Client::recvDelimProtobuf(unsigned char *buffer){
     }
     input.PopLimit(limit);
     return msg;
-
-//    UINT32 message2_size = 0;
-//    input.ReadVarint32(&message2_size);
-//    limit = input.PushLimit(message2_size);
-//    msg2.ParseFromCodedStream(&input);
-//    input.PopLimit(limit);
-
-//    unsigned int length=0;
-//    int recv_bytes=0;
-//    char bite;
-//    int received = this->clientUDP.toReceive(&bite, 1, 0);
-//    if(received<0){
-//        ROS_INFO("No reception :_(");
-//        return received;
-//    }
-//    else
-//        recv_bytes += received;
-//    length = (bite & 0x7f);
-//    while(bite & 0x80){
-//        ROS_INFO("length:%i", length);
-//        memset(&bite, 0, 1);
-//        received = clientUDP.toReceive(&bite, 1, 0);
-//        if(received<0)
-//            return received;
-//        else
-//            recv_bytes += received;
-//        length|= (bite & 0x7F) << (7*(recv_bytes-1));
-//    }
-
-//    //receive remainder of message
-//    recv_bytes=0;
-//    *buffer=(unsigned char *)malloc(sizeof(unsigned char) * length);
-//    while(recv_bytes < length){
-//        received = clientUDP.toReceive((char *)(*buffer + (sizeof(unsigned char) * recv_bytes)), length-recv_bytes, 0);
-//        if(received<0)
-//            return received;
-//        else
-//            recv_bytes+=received;
-//    }
-//    return recv_bytes;
 }
 
 /*
@@ -257,12 +217,17 @@ void* Client::receivingImgLoop(){
 
     printf("\n");
 
+    printf("Waiting 3s for the server\n");
+    sleep(3);
+
     ros::Rate loop_rate(30);
     printf("Start recording!!!\n");
 
 
     //Init UDP by sending a bit
-    clientUDP.toSend((char *)iz4BuffDecod, 1, 0);
+    printf("please/n");
+    clientUDP.toSend((char *)iz4BuffDecod, 100, 0);
+    printf("yeah!/n");
 
     while(recording){
         //printf("Receiving image...\n");bigBuffer
@@ -324,70 +289,6 @@ void* Client::receivingImgLoop(){
     }
     ROS_INFO("Img total =%i", i);
 }
-
-
-/**
-    Debugging fonction, send a image from a PNG file
-*/
-/**
-void Client::foo(){
-    unsigned char *buffer;
-    unsigned char* data;
-    dotCapture::Img message;
-    int i = 0;
-    int sizeLz4;
-
-
-    unsigned char* pngBuf;
-    size_t pngSize;
-
-    camera_info_manager::CameraInfoManager m(nh, "narrow_stereo", "package://client_cube/calibration.ini");
-    sensor_msgs::CameraInfo ros_camInfo = m.getCameraInfo();
-    WIDTH = ros_camInfo.width;
-    HEIGHT = ros_camInfo.height;
-
-    unsigned char* iz4BuffDecod = (unsigned char*)malloc(WIDTH * HEIGHT);
-
-    // Initiation of the Opencv-ROS bridge
-    cv_bridge::CvImage cv_image;
-    cv_image.encoding = "mono8";
-    IplImage* pImg;
-    pImg = cvCreateImageHeader(cvSize(WIDTH, HEIGHT), IPL_DEPTH_8U, 1);
-    sensor_msgs::Image ros_image;
-
-
-
-    printf("\n");
-    ros::Rate loop_rate(30);
-
-    unsigned width, height;
-
-    string filename;
-    ros::param::get("~filename", filename);
-    unsigned error = lodepng_decode_file(&pngBuf, &width, &height, filename.c_str(), LCT_GREY,  8);
-    if(error) ROS_ERROR("error %u: %s", error, lodepng_error_text(error));
-
-    cvSetData(pImg, pngBuf, pImg->widthStep);
-
-    cv_image.image = pImg;
-    while(ros::ok()){
-
-        cv_image.header.stamp = ros::Time::now();
-
-        cv_image.toImageMsg(ros_image);
-        pub.publish(ros_image, ros_camInfo);
-
-        //compressToPNG(pngBuf, &pngSize, iz4BuffDecod, sizeLz4);
-        //saveFilePNG(*pngBuf, pngSize, "fromGoogleWithLove.png");
-        i++;
-
-        ros::spinOnce();
-        loop_rate.sleep();
-    }
-    free(pngBuf);
-    ROS_INFO("Images total =%i", i);
-}
-*/
 
 
 /*
