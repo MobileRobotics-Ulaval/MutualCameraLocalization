@@ -4,27 +4,38 @@ using namespace std;
 
 namespace sick_pose
 {
-SP::SP(ros::NodeHandle n) : 
-    n_(n),
+SP::SP(ros::NodeHandle n) :
+   nh(n),
     receive_scan_(false),
     cube_initiation(false)
   {
-  // Set up a dynamic reconfigure server.
-  // This should be done before reading parameter server values.
-  dynamic_reconfigure::Server<sick_pose::sickPoseConfig>::CallbackType cb_;
-  cb_ = boost::bind(&SP::dynamicParametersCallback, this, _1, _2);
-  dr_server_.setCallback(cb_);
 
-	laser_scan_ = n_.subscribe("/scan", 1, &SP::scanCallback, this);
+    if(ros::param::has("~nbrCubes")){
+        ros::param::get("~nbrCubes", NBRCUBES);
+    }
+    else{
+        ROS_WARN("No \"_nbrCubes\" parameter detected, number of cube set to 1");
+        NBRCUBES = 1;
+    }
 
-    cubeA_pub_ = n_.advertise<geometry_msgs::PoseStamped>("/cubeA_pose",1);
-    cubeB_pub_ = n_.advertise<geometry_msgs::PoseStamped>("/cubeB_pose",1);
-    scan_aug_pub_ = n_.advertise<sensor_msgs::PointCloud>("/scan_augment",1);
-    zone_pub_ = n_.advertise<geometry_msgs::PolygonStamped>("/zone",1);
-    cube_poly_pub_ = n_.advertise<geometry_msgs::PolygonStamped>("/cube_poly",1);
+    ROS_INFO("Number of cube(s): %i \n", NBRCUBES);
 
-    marker_cubeA_pub_ = n.advertise<visualization_msgs::Marker>("/cubeA_marker", 10);
-    marker_cubeB_pub_ = n.advertise<visualization_msgs::Marker>("/cubeB_marker", 10);
+    // Set up a dynamic reconfigure server.
+    // This should be done before reading parameter server values.
+    dynamic_reconfigure::Server<sick_pose::sickPoseConfig>::CallbackType cb_;
+    cb_ = boost::bind(&SP::dynamicParametersCallback, this, _1, _2);
+    dr_server_.setCallback(cb_);
+
+    laser_scan_ = this->nh.subscribe("/scan", 1, &SP::scanCallback, this);
+
+    cubeA_pub_     = this->nh.advertise<geometry_msgs::PoseStamped>("/cubeA_pose",1);
+    cubeB_pub_     = this->nh.advertise<geometry_msgs::PoseStamped>("/cubeB_pose",1);
+    scan_aug_pub_  = this->nh.advertise<sensor_msgs::PointCloud>("/scan_augment",1);
+    zone_pub_      = this->nh.advertise<geometry_msgs::PolygonStamped>("/zone",1);
+    cube_poly_pub_ = this->nh.advertise<geometry_msgs::PolygonStamped>("/cube_poly",1);
+
+    marker_cubeA_pub_ = this->nh.advertise<visualization_msgs::Marker>("/cubeA_marker", 10);
+    marker_cubeB_pub_ = this->nh.advertise<visualization_msgs::Marker>("/cubeB_marker", 10);
 
     initMarker();
 }
@@ -42,7 +53,7 @@ void SP::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_msg){
 	}
 
 
-	vector<Eigen::Vector2d> CubeCenter = findCube(cloud.points);
+	ListVector2d CubeCenter = findCube(cloud.points);
 
 	pose_.pose.position.z = 0;
 	if(cube_initiation){
@@ -115,10 +126,10 @@ void SP::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_msg){
 
 }
 
-vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
+ListVector2d SP::findCube(vector<geometry_msgs::Point32> &p_data){
 	// === FILTERING ======
 	// First we remove the walls
-	vector<Eigen::Vector2d> data;
+	ListVector2d data;
 	vector<geometry_msgs::Point32> pointss;
 	for(int i = 0; i < p_data.size(); i++){
 		if(!((p_data[i].x > front_wall) || (p_data[i].x < back_wall) || (p_data[i].y > left_wall) || (p_data[i].y < right_wall))
@@ -132,7 +143,7 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 	//p_data = pointss;
 	if(data.size() == 0){
 		ROS_INFO("No dot found!!!");
-		vector<Eigen::Vector2d> c;
+		ListVector2d c;
 		return c;
 	}
 
@@ -141,8 +152,8 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 	//int iCluster = 0;
 
 	//vector< vector<Eigen::Vector2d> > ClusterMembers(1, vector<Eigen::Vector2d>(data[0]));
-	vector< vector<Eigen::Vector2d> > ClusterMembers;
-	vector<Eigen::Vector2d> firstCluster;
+	vector< ListVector2d > ClusterMembers;
+	ListVector2d firstCluster;
 	firstCluster.push_back(data[0]);// first point is member of first cluster
 
 	ClusterMembers.push_back(firstCluster);
@@ -152,7 +163,7 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 	    if ((ClusterMembers.back().back() - data[i]).norm() > cluster_distance_threshold){
 	        // Trigger a new cluster member
 	        //iCluster++;
-			vector<Eigen::Vector2d> emptyCluster;
+			ListVector2d emptyCluster;
 			emptyCluster.push_back(data[i]);
 	        ClusterMembers.push_back(emptyCluster);
 	    }
@@ -164,7 +175,7 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 
 
 	// Now prune the clusters based on a number of conditions.
-	vector< vector<Eigen::Vector2d> > KeptCluster;
+	vector< ListVector2d > KeptCluster;
 	for( int i = 0; i < ClusterMembers.size(); i++){
 	    // Flush the cluster if: -the number of members is insufficient
 	    //                       -the distance between the first and last point is too short
@@ -175,57 +186,85 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 	        KeptCluster.push_back(ClusterMembers[i]);
 	    }
 	}
-	
-	// Perform the split and merge algorithm
+
+
 	double dist;
 	int SplitIndex;
-	vector<Eigen::Vector2d> CubeCenter;
-	Eigen::Vector2d zeroAngularVector(1,0);
+	ListVector2d CubeCenter;
+	//Eigen::Vector2d zeroAngularVector(1,0);
 	Eigen::Vector2d p1, p2;
 
 	double lengthLeft, lengthRight;
 	zone.polygon.points.clear();
 	std::vector<double> anglesCluster;
-	double angle;
+	//double angle;
 	for(int iCluster = 0;  iCluster < KeptCluster.size(); iCluster++){
 		//ROS_INFO("a");
-	    SplitIndex = SplitAndMerge(KeptCluster[iCluster], dist);
-		//ROS_INFO("b%f",dist);
+	   // SplitIndex = SplitAndMerge(KeptCluster[iCluster], dist);
+		int begin = 0;
+		int end = KeptCluster[iCluster].size() - 1;
+		SplitIndex = SplitAndMerge(KeptCluster[iCluster],
+								   begin,
+								   end,
+								   dist);
+		/*ListVector2d::iterator beginIt = KeptCluster[iCluster].begin();
+		ListVector2d::iterator endIt = KeptCluster[iCluster].end();
+		SplitIndex = SplitAndMerge(beginIt, endIt, dist);*/
+
 	    if (dist > split_and_merge_threshold){
 	        // we have two lines. We will be lazy and pick the first and last
-	        // point to figure out the line segment
+			// point to figure out the line segment
 	        lengthLeft = (KeptCluster[iCluster][0] - KeptCluster[iCluster][SplitIndex]).norm();
-	        lengthRight = (KeptCluster[iCluster][SplitIndex] - KeptCluster[iCluster].back()).norm();
+			lengthRight = (KeptCluster[iCluster][SplitIndex] - KeptCluster[iCluster].back()).norm();
 
-	        if( lengthLeft > 1.5 && lengthRight > 1.5){
-		        /*if(SplitIndex > KeptCluster[iCluster].size() - SplitIndex){
-		        	ComputeCubeCenterWithLine(KeptCluster[iCluster], 0, SplitIndex, p1, p2, p_data);
-		        }
-		        else{
-		        	ComputeCubeCenterWithLine(KeptCluster[iCluster], SplitIndex, KeptCluster[iCluster].size() - 1, p1, p2, p_data);
-		        }*/
-		       ComputeCubeCenterWithLine(KeptCluster[iCluster], 0, SplitIndex, p1, p2, p_data);
+			if(lengthLeft > 1.5 && lengthRight > 1.5){
+
+				// This resolve some issue with where a person was detected has part of the cube
+				// By removing the points made by the person from the cube, we can find the correct
+				// center of the cube
+				double distZeroToCorner, distCornerToEnd;
+				//ListVector2d::iterator splitPlusOneIt = beginIt + SplitIndex + 1;
+				//ListVector2d::iterator splitIt = beginIt + SplitIndex;
+				int SplitIndexZeroToCorner = SplitAndMerge(KeptCluster[iCluster],
+														   0,
+														   SplitIndex,
+														   distZeroToCorner);
+				int SplitIndexCornerToEnd = SplitAndMerge(KeptCluster[iCluster],
+														  SplitIndex,
+														  end,
+														  distCornerToEnd);
+
+				if(distZeroToCorner > edge_split_and_merge_threshold){
+					ROS_INFO("Person detected on the down side!!!");
+					begin = SplitIndexZeroToCorner;
+				}
+				if(distCornerToEnd > edge_split_and_merge_threshold){
+					ROS_INFO("Person detected on the upper side!!!");
+					end = SplitIndexCornerToEnd;
+				}
+
+				ComputeCubeCenterWithLine(KeptCluster[iCluster], begin, SplitIndex, p1, p2, p_data);
 				Eigen::Vector2d centerA = ComputeCubeCenter(p1, p2);
-		       	ComputeCubeCenterWithLine(KeptCluster[iCluster], SplitIndex, KeptCluster[iCluster].size() - 1, p1, p2, p_data);
-	    		CubeCenter.push_back((ComputeCubeCenter(p1, p2) - centerA) * 0.5 + centerA);
-
-		        //ROS_INFO("Angle:%f", anglesCluster.back());
+				ComputeCubeCenterWithLine(KeptCluster[iCluster], SplitIndex, end, p1, p2, p_data);
+				CubeCenter.push_back((ComputeCubeCenter(p1, p2) - centerA) * 0.5 + centerA);
 	        }
-	        else if(lengthLeft > 1.5 && SplitIndex > 13){
+			else if(lengthLeft > 1.5 && SplitIndex > 13){
 		        ComputeCubeCenterWithLine(KeptCluster[iCluster], 0, SplitIndex, p1, p2, p_data);
-	    		CubeCenter.push_back(ComputeCubeCenter(p1, p2));
+				CubeCenter.push_back(ComputeCubeCenter(p1, p2));
 	        }
 	        //else if(lengthRight > 1.5 && KeptCluster[iCluster].size() - SplitIndex > 13){
-	        else{
+			else{
 		        ComputeCubeCenterWithLine(KeptCluster[iCluster], SplitIndex, KeptCluster[iCluster].size() - 1, p1, p2, p_data);
-	    		CubeCenter.push_back(ComputeCubeCenter(p1, p2));
-	        }
+				CubeCenter.push_back(ComputeCubeCenter(p1, p2));
+			}
 	    }
 	    else{
 	        // we have one line
+			//ROS_INFO("We have one line");
 		     ComputeCubeCenterWithLine(KeptCluster[iCluster], 0, KeptCluster[iCluster].size() - 1, p1, p2, p_data);
 	    	CubeCenter.push_back(ComputeCubeCenter(p1, p2));
 	    }
+
 	    //CubeCenter.push_back(ComputeCubeCenter(p1, p2));
 
 	   // anglesCluster.push_back((p1 - p2)[1]/abs((p1 - p2)[1]) * acos((p1 - p2)[0]/(p1 - p2).norm()));
@@ -233,19 +272,16 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 	}
 
 	// if the cube are not already initiated
-	if(!cube_initiation && CubeCenter.size() >= 2){
-		cubes.push_back(CubeCenter[0]);
-		cubes.push_back(CubeCenter[1]);
-		missing_association.push_back(0);
-		missing_association.push_back(0);
-
-
-		cubesAngles.push_back(anglesCluster[0]);
-		cubesAngles.push_back(anglesCluster[1]);
+	if(!cube_initiation && CubeCenter.size() >= NBRCUBES){
+		for(int i = 0; i < NBRCUBES; i++){
+			cubes.push_back(CubeCenter[i]);
+			missing_association.push_back(0);
+			cubesAngles.push_back(anglesCluster[i]);
+		}
 		cube_initiation = true;
 	}
 	else if(cube_initiation ){
-		for(int index = 0; index < 2; index++){
+		for(int index = 0; index < NBRCUBES; index++){
 			if(CubeCenter.size() >= 1){
 				int nearest_id = -1;
 				//double near
@@ -276,7 +312,7 @@ vector<Eigen::Vector2d> SP::findCube(vector<geometry_msgs::Point32> &p_data){
 		}
 		// if there is still dots
 		if(CubeCenter.size() > 0){
-			for(int index = 0; index < 2; index++){
+			for(int index = 0; index < NBRCUBES; index++){
 				if(missing_association[index] > max_tick_ghost){
 
 					int nearest_id = -1;
@@ -326,30 +362,33 @@ double SP::smallestAngle(double old, double next){
 	//return best;
 }
 
-int SP::SplitAndMerge(vector<Eigen::Vector2d> data, double & dist){
+/*int SP::SplitAndMerge(ListVector2d::iterator begin,
+					  ListVector2d::iterator end,
+					  double & dist){*/
+int SP::SplitAndMerge(ListVector2d data, int begin, int end, double & dist){
 	// Perform the split and merge algorithm
     int split = -1;
 
-    Eigen::Vector3d Q1(data[0][0], 	   data[0][1], 	   0);
-    Eigen::Vector3d Q2(data.back()[0], data.back()[1], 0);
+    Eigen::Vector3d Q1(data[begin][0], data[begin][1], 0);
+    Eigen::Vector3d Q2(data[end][0],   data[end][1],   0);
     dist = 0;
 
     double temp_dist;
-    for(int i = 0; i < data.size(); i++){
+    for(int i = begin; i <= end; i++){
         Eigen::Vector3d P(data[i][0], data[i][1], 0);
 
         temp_dist = (Q2-Q1).cross(P-Q1).norm()/((Q2-Q1).norm());
        	if(temp_dist > dist){
        		dist = temp_dist;
        		split = i;
-       	}
+        }
     }
 
     return split;
     
 }
 
-void SP::ComputeCubeCenterWithLine(vector<Eigen::Vector2d> pointsInLine, int begin, int end, Eigen::Vector2d & p1,  Eigen::Vector2d & p2, vector<geometry_msgs::Point32> &p_data){
+void SP::ComputeCubeCenterWithLine(ListVector2d pointsInLine, int begin, int end, Eigen::Vector2d & p1,  Eigen::Vector2d & p2, vector<geometry_msgs::Point32> &p_data){
 	//Eigen::linearRegression::linearRegression(end, &(pointsInLine[0]), &line_coeffs, 0);
 	// ===== linear Regression ==== 
 	// explication => http://onlinestatbook.com/2/regression/intro.html
@@ -550,6 +589,7 @@ void SP::dynamicParametersCallback(sick_pose::sickPoseConfig &config, uint32_t l
 
 	cluster_distance_threshold = config.cluster_distance_threshold;
 	split_and_merge_threshold = config.split_and_merge_threshold;
+	edge_split_and_merge_threshold = config.edge_split_and_merge_threshold;
 	min_cluster_size = config.min_cluster_size;
 	max_line_length = config.max_line_length;
 	min_line_length = config.min_line_length;
@@ -567,7 +607,7 @@ void SP::dynamicParametersCallback(sick_pose::sickPoseConfig &config, uint32_t l
 int main(int argc, char* argv[]){
 
     
-	ROS_INFO("Main start...\n");
+    ROS_INFO("Main start...");
 	ros::init(argc, argv,  "sick_pose_node");
 
 	ros::NodeHandle n;

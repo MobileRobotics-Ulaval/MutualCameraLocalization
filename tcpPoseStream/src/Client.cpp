@@ -24,7 +24,7 @@ Client::Client(){
 	comSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (comSocket < 0) 
         ROS_ERROR("ERROR opening socket");
-        
+
    struct hostent *host = gethostbyname(address.c_str());
     if (host == NULL) 
         ROS_ERROR("ERROR, no such host");
@@ -58,8 +58,8 @@ void Client::callback(const geometry_msgs::PoseStamped::ConstPtr& pos){
     string r = request.str();
     ROS_INFO(r.c_str());
      if(send(comSocket, r.data(), r.size(), 0) < 0){
-        ROS_ERROR("Error: Impossible d'envoyer");
-        //close(comSocket);
+        perror("Impossible d'envoyer");
+        close(comSocket);
         //exit(0);
     }
 }
